@@ -1,4 +1,4 @@
-local VERSION = "AKB 1.9" -- เปลี่ยนเมนูเป็น Frame ปกติ แก้ปุ่มกดยาก
+local VERSION = "AKB 2.0" -- แก้ปุ่มกดไม่ติด (Dual Input Fix + Debug)
 
 if not game:IsLoaded() then
     game.Loaded:Wait()
@@ -61,7 +61,7 @@ local COLOR_BLOCKED_USER = Color3.fromRGB(70, 70, 70)
 pcall(function()
     StarterGui:SetCore("SendNotification", {
         Title = "AKB System " .. VERSION;
-        Text = isMobile and "โหมดมือถือ: พร้อมใช้งาน" or "กำลังเริ่มทำงาน...";
+        Text = "Loaded! Check F9 for logs.";
         Duration = 3;
     })
 end)
@@ -163,7 +163,7 @@ screenGui.Name = "FantasyESP_Gui"
 screenGui.ResetOnSpawn = false
 screenGui.IgnoreGuiInset = true
 screenGui.Parent = localPlayer:WaitForChild("PlayerGui")
-screenGui.DisplayOrder = 10 
+screenGui.DisplayOrder = 100 -- [FIX] Set highest display order
 
 local espFolder = Instance.new("Folder", screenGui)
 espFolder.Name = "ESP_Container"
@@ -255,7 +255,7 @@ verLabel.TextStrokeTransparency = 0.5
 verLabel.TextSize = 12
 verLabel.Parent = toggleMenuBtn
 
--- [FIX] Change ButtonContainer from ScrollingFrame to Frame
+-- [FIX] ButtonContainer
 local buttonContainer = Instance.new("Frame")
 buttonContainer.Name = "ButtonContainer"
 buttonContainer.Size = UDim2.new(0, 200, 0, 220)
@@ -263,7 +263,9 @@ buttonContainer.Position = UDim2.new(0, 70, 0.5, -110)
 buttonContainer.BackgroundColor3 = THEME_DARK_BG
 buttonContainer.BackgroundTransparency = 0.2
 buttonContainer.Visible = false
+buttonContainer.ZIndex = 50 -- Higher ZIndex
 buttonContainer.Parent = screenGui
+makeDraggable(buttonContainer) -- Make container draggable too
 
 local bcCorner = Instance.new("UICorner", buttonContainer)
 bcCorner.CornerRadius = UDim.new(0, 10)
@@ -273,10 +275,29 @@ local bcLayout = Instance.new("UIListLayout", buttonContainer)
 bcLayout.Padding = UDim.new(0, 5); bcLayout.SortOrder = Enum.SortOrder.LayoutOrder; bcLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
 local bcPadding = Instance.new("UIPadding", buttonContainer); bcPadding.PaddingTop = UDim.new(0, 10)
 
-toggleMenuBtn.Activated:Connect(function()
+-- [FIX] Dual event binding for Toggle
+local function onToggle()
+    print("Toggle Menu Pressed")
     buttonContainer.Visible = not buttonContainer.Visible
     tmStroke.Color = buttonContainer.Visible and THEME_SELECTED or THEME_AKB_BLUE
-end)
+end
+toggleMenuBtn.Activated:Connect(onToggle)
+toggleMenuBtn.MouseButton1Click:Connect(onToggle)
+
+-- [FIX] Helper function to bind button action
+local function bindButton(btn, callback)
+    local db = false
+    local function action()
+        if db then return end
+        db = true
+        print("Button " .. btn.Name .. " Pressed")
+        callback()
+        task.wait(0.2)
+        db = false
+    end
+    btn.Activated:Connect(action)
+    btn.MouseButton1Click:Connect(action)
+end
 
 local function createFantasyButton(name, text, color)
     local btn = Instance.new("TextButton")
@@ -288,7 +309,7 @@ local function createFantasyButton(name, text, color)
     btn.Font = Enum.Font.GothamBold; btn.TextSize = 14
     btn.AutoButtonColor = true
     btn.Active = true 
-    btn.ZIndex = 5 -- Ensure it's above container
+    btn.ZIndex = 51 -- Higher than container
     btn.Parent = buttonContainer
     
     local c = Instance.new("UICorner", btn); c.CornerRadius = UDim.new(0, 8)
@@ -414,7 +435,7 @@ local mfCorner = Instance.new("UICorner", mutualFrame); mfCorner.CornerRadius = 
 local mfStroke = Instance.new("UIStroke", mutualFrame); mfStroke.Color = THEME_MAIN; mfStroke.Thickness = 3
 local mfHeader = Instance.new("TextLabel", mutualFrame); mfHeader.Text = "Friends List"; mfHeader.Size = UDim2.new(1,0,0,40); mfHeader.BackgroundTransparency = 1; mfHeader.TextColor3 = THEME_WHITE; mfHeader.Font = Enum.Font.GothamBold; mfHeader.TextSize = 18; mfHeader.ZIndex = 21
 local mfClose = Instance.new("TextButton", mutualFrame); mfClose.Text = "X"; mfClose.TextColor3 = Color3.fromRGB(255,80,80); mfClose.BackgroundTransparency = 1; mfClose.Size = UDim2.new(0,40,0,40); mfClose.Position = UDim2.new(1,-40,0,0); mfClose.Font = Enum.Font.GothamBlack; mfClose.TextSize = 20; mfClose.ZIndex = 21
-mfClose.Activated:Connect(function() mutualFrame.Visible = false end) -- Use Activated
+bindButton(mfClose, function() mutualFrame.Visible = false end)
 
 local mfList = Instance.new("ScrollingFrame", mutualFrame)
 mfList.Size = UDim2.new(0.9, 0, 0.85, -40)
@@ -476,7 +497,7 @@ showMutualFriends = function(targetPlayer)
         for _, p in ipairs(serverFriends) do
              local btn = Instance.new("TextButton", mfList); btn.Text = p.DisplayName; btn.Size = UDim2.new(1,0,0,30); btn.BackgroundColor3 = Color3.fromRGB(0,100,50); btn.TextColor3 = THEME_WHITE; btn.ZIndex = 22
              Instance.new("UICorner", btn).CornerRadius = UDim.new(0,6)
-             btn.Activated:Connect(function() -- Use Activated
+             bindButton(btn, function()
                   mutualFrame.Visible = false
                   camera.CameraSubject = p.Character and p.Character:FindFirstChild("Humanoid")
                   spectatingPlayer = p
@@ -500,10 +521,10 @@ local nonFriendsLabel = Instance.new("TextLabel", statsFrame); nonFriendsLabel.S
 local serverHopFrame = Instance.new("Frame", screenGui); serverHopFrame.Visible=false; serverHopFrame.Size=UDim2.new(0,300,0,300); serverHopFrame.Position=UDim2.new(0.5,-150,0.5,-150); serverHopFrame.BackgroundColor3=THEME_DARK_BG; makeDraggable(serverHopFrame)
 Instance.new("UICorner", serverHopFrame).CornerRadius=UDim.new(0,15)
 local hopClose = Instance.new("TextButton", serverHopFrame); hopClose.Text="X"; hopClose.Size=UDim2.new(0,40,0,40); hopClose.Position=UDim2.new(1,-40,0,0); hopClose.BackgroundTransparency=1; hopClose.TextColor3=Color3.fromRGB(255,80,80)
-hopClose.Activated:Connect(function() serverHopFrame.Visible=false end)
+bindButton(hopClose, function() serverHopFrame.Visible=false end)
 local jobIdInput = Instance.new("TextBox", serverHopFrame); jobIdInput.Size=UDim2.new(0.8,0,0,35); jobIdInput.Position=UDim2.new(0.1,0,0.2,0); jobIdInput.Text=""; jobIdInput.PlaceholderText="Job ID"
 local joinJobBtn = Instance.new("TextButton", serverHopFrame); joinJobBtn.Text="🚀 Join"; joinJobBtn.Size=UDim2.new(0.8,0,0,35); joinJobBtn.Position=UDim2.new(0.1,0,0.35,0); joinJobBtn.BackgroundColor3=THEME_HOP
-joinJobBtn.Activated:Connect(function() if jobIdInput.Text~="" then TeleportService:TeleportToPlaceInstance(game.PlaceId, jobIdInput.Text, localPlayer) end end)
+bindButton(joinJobBtn, function() if jobIdInput.Text~="" then TeleportService:TeleportToPlaceInstance(game.PlaceId, jobIdInput.Text, localPlayer) end end)
 
 local listFrame = Instance.new("ScrollingFrame", screenGui); listFrame.Visible=false; listFrame.Size=UDim2.new(0,250,0,300); listFrame.Position=UDim2.new(1,-260,0,100); listFrame.BackgroundColor3=Color3.fromRGB(15,15,20); makeDraggable(listFrame)
 Instance.new("UIListLayout", listFrame).SortOrder=Enum.SortOrder.LayoutOrder
@@ -550,8 +571,8 @@ toggleFreeCam = function()
     end
 end
 
-freeCamButton.Activated:Connect(toggleFreeCam)
-resetButton.Activated:Connect(function() 
+bindButton(freeCamButton, toggleFreeCam)
+bindButton(resetButton, function() 
     if localPlayer.Character then 
         camera.CameraSubject = localPlayer.Character:FindFirstChild("Humanoid")
         spectatingPlayer = nil
@@ -565,9 +586,9 @@ resetButton.Activated:Connect(function()
         freeCamButton.UIStroke.Color = THEME_FREECAM
     end 
 end)
-listButton.Activated:Connect(function() isPlayerListVisible=not isPlayerListVisible; listFrame.Visible=isPlayerListVisible; searchBox.Visible=isPlayerListVisible; if isPlayerListVisible then updatePlayerList() end end)
-hopButton.Activated:Connect(function() serverHopFrame.Visible=not serverHopFrame.Visible end)
-espButton.Activated:Connect(function() isEspEnabled=not isEspEnabled; espButton.UIStroke.Color = isEspEnabled and THEME_MAIN or Color3.fromRGB(200,60,60); if not isEspEnabled then clearAllESP() end end)
+bindButton(listButton, function() isPlayerListVisible=not isPlayerListVisible; listFrame.Visible=isPlayerListVisible; searchBox.Visible=isPlayerListVisible; if isPlayerListVisible then updatePlayerList() end end)
+bindButton(hopButton, function() serverHopFrame.Visible=not serverHopFrame.Visible end)
+bindButton(espButton, function() isEspEnabled=not isEspEnabled; espButton.UIStroke.Color = isEspEnabled and THEME_MAIN or Color3.fromRGB(200,60,60); if not isEspEnabled then clearAllESP() end end)
 
 local nameplates = {}
 local function clearAllESP()
@@ -604,7 +625,7 @@ updatePlayerList = function()
             nm.TextXAlignment = Enum.TextXAlignment.Left
             nm.ZIndex = 2
 
-            specBtn.Activated:Connect(function() 
+            bindButton(specBtn, function() 
                 if p.Character and p.Character:FindFirstChild("Humanoid") then
                     if isFreeCamEnabled then
                         isFreeCamEnabled = false
@@ -630,7 +651,7 @@ updatePlayerList = function()
                 mfBtn.Font = Enum.Font.GothamBold
                 mfBtn.ZIndex = 3
                 Instance.new("UICorner", mfBtn).CornerRadius = UDim.new(0,6)
-                mfBtn.Activated:Connect(function() showMutualFriends(p) end)
+                bindButton(mfBtn, function() showMutualFriends(p) end)
 
                 local blk = Instance.new("TextButton", row)
                 blk.Size = UDim2.new(0, 30, 0, 30)
@@ -646,7 +667,7 @@ updatePlayerList = function()
                 blk.Text = isBlocked and "🚫" or "🛡️"
                 blk.TextColor3 = isBlocked and Color3.fromRGB(255, 100, 100) or Color3.fromRGB(150, 150, 150)
 
-                blk.Activated:Connect(function()
+                bindButton(blk, function()
                     pcall(function()
                         if blockedStatus[p.UserId] then StarterGui:SetCore("PromptUnblockPlayer", p)
                         else StarterGui:SetCore("PromptBlockPlayer", p) end
@@ -706,7 +727,7 @@ RunService.RenderStepped:Connect(function(dt)
              end)
         end
 
-        spBlockBtn.Activated:Connect(function()
+        bindButton(spBlockBtn, function()
             pcall(function()
                 if blockedStatus[spectatingPlayer.UserId] then StarterGui:SetCore("PromptUnblockPlayer", spectatingPlayer)
                 else StarterGui:SetCore("PromptBlockPlayer", spectatingPlayer) end
@@ -768,7 +789,7 @@ RunService.RenderStepped:Connect(function(dt)
                     clickBtn.BackgroundTransparency = 1
                     clickBtn.Text = ""
                     clickBtn.Active = true 
-                    clickBtn.Activated:Connect(function()
+                    bindButton(clickBtn, function()
                         if p.Character and p.Character:FindFirstChild("Humanoid") then
                             if isFreeCamEnabled then
                                 isFreeCamEnabled = false
