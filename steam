@@ -1,4 +1,4 @@
-local VERSION = "AKB 1.1" -- ระบุเวอร์ชัน
+local VERSION = "AKB 1.2" -- อัปเดตเวอร์ชัน
 
 if not game:IsLoaded() then
     game.Loaded:Wait()
@@ -45,7 +45,8 @@ optimizePerformance()
 local updatePlayerList
 local updateListSelection
 local showMutualFriends
-local mobileInput = Vector3.new(0, 0, 0) -- ตัวแปรเก็บค่าการเดินของมือถือ
+local mobileInput = Vector3.new(0, 0, 0) 
+local toggleFreeCam -- ประกาศฟังก์ชันล่วงหน้า
 
 pcall(function()
     StarterGui:SetCore("SendNotification", {
@@ -169,7 +170,7 @@ toggleMenuBtn.Name = "AKB_Toggle"
 toggleMenuBtn.BackgroundColor3 = THEME_DARK_BG
 toggleMenuBtn.Size = UDim2.new(0, 50, 0, 50)
 toggleMenuBtn.Position = UDim2.new(0, 10, 0.5, -25)
-toggleMenuBtn.Image = "rbxassetid://84859235971563" -- [EDIT] ใช้รูปตามที่ขอ
+toggleMenuBtn.Image = "rbxassetid://84859235971563"
 toggleMenuBtn.Parent = screenGui
 makeDraggable(toggleMenuBtn)
 
@@ -240,7 +241,7 @@ local hopButton = createFantasyButton("HopButton", "⚡ ย้ายเซิร
 local listButton = createFantasyButton("ListButton", "👥 คณะเดินทาง", THEME_MAIN)
 
 -- ==========================================================
--- [NEW] Mobile FreeCam Controls UI
+-- [NEW] Mobile FreeCam Controls UI (Left Side)
 -- ==========================================================
 local mobileCamFrame = Instance.new("Frame")
 mobileCamFrame.Name = "MobileCamControls"
@@ -249,10 +250,11 @@ mobileCamFrame.BackgroundTransparency = 1
 mobileCamFrame.Visible = false
 mobileCamFrame.Parent = screenGui
 
--- Control Pad (Bottom Right)
+-- Control Pad (Move to Bottom Left)
 local padFrame = Instance.new("Frame")
 padFrame.Size = UDim2.new(0, 150, 0, 150)
-padFrame.Position = UDim2.new(1, -170, 1, -170)
+-- [EDIT] ย้ายมาซ้ายล่าง (เว้นระยะจากขอบนิดหน่อย)
+padFrame.Position = UDim2.new(0, 30, 1, -180) 
 padFrame.BackgroundTransparency = 1
 padFrame.Parent = mobileCamFrame
 
@@ -283,13 +285,13 @@ local function createCamBtn(text, pos, callbackPress, callbackRelease)
     end)
 end
 
--- ปุ่มควบคุมทิศทาง
+-- ปุ่มควบคุมทิศทาง (ใช้ Layout WASD)
 createCamBtn("▲", UDim2.new(0.35, 0, 0, 0), function() mobileInput = Vector3.new(mobileInput.X, mobileInput.Y, -1) end, function() mobileInput = Vector3.new(mobileInput.X, mobileInput.Y, 0) end) -- Forward
 createCamBtn("▼", UDim2.new(0.35, 0, 0.7, 0), function() mobileInput = Vector3.new(mobileInput.X, mobileInput.Y, 1) end, function() mobileInput = Vector3.new(mobileInput.X, mobileInput.Y, 0) end) -- Backward
 createCamBtn("◄", UDim2.new(0, 0, 0.35, 0), function() mobileInput = Vector3.new(-1, mobileInput.Y, mobileInput.Z) end, function() mobileInput = Vector3.new(0, mobileInput.Y, mobileInput.Z) end) -- Left
 createCamBtn("►", UDim2.new(0.7, 0, 0.35, 0), function() mobileInput = Vector3.new(1, mobileInput.Y, mobileInput.Z) end, function() mobileInput = Vector3.new(0, mobileInput.Y, mobileInput.Z) end) -- Right
 
--- ปุ่มขึ้นลง (Up/Down) แยกออกมา
+-- ปุ่มขึ้นลง (Up/Down) แยกออกมาไว้ขวา (ปกติเกมมือถือปุ่ม Action อยู่ขวา)
 local upDownFrame = Instance.new("Frame")
 upDownFrame.Size = UDim2.new(0, 50, 0, 110)
 upDownFrame.Position = UDim2.new(1, -50, 0.5, 0)
@@ -313,7 +315,7 @@ createUD("⬆", UDim2.new(0,0,0,0), 1)
 createUD("⬇", UDim2.new(0,0,0.5,0), -1)
 
 -- Touch Camera Look Logic
-local touchSens = 0.2
+local touchSens = 0.6 -- [EDIT] เพิ่มความไวจาก 0.2 เป็น 0.6 ตามที่ขอ
 local camRotX, camRotY = 0, 0
 
 local touchPanel = Instance.new("TextButton")
@@ -321,7 +323,7 @@ touchPanel.Name = "TouchLookZone"
 touchPanel.Size = UDim2.new(1, 0, 1, 0)
 touchPanel.BackgroundTransparency = 1
 touchPanel.Text = ""
-touchPanel.ZIndex = -1 -- อยู่หลังปุ่มกด
+touchPanel.ZIndex = -1 
 touchPanel.Parent = mobileCamFrame
 
 touchPanel.InputChanged:Connect(function(input)
@@ -334,11 +336,9 @@ touchPanel.InputChanged:Connect(function(input)
     end
 end)
 
-
 -- ==========================================================
 -- Other UI Elements (Hop, Stats, etc)
 -- ==========================================================
--- ... (Stats Frame Code omitted for brevity, logic maintained) ...
 local statsFrame = Instance.new("Frame")
 statsFrame.Name = "StatsDisplay"
 statsFrame.BackgroundColor3 = THEME_DARK_BG; statsFrame.BackgroundTransparency = 0.3; statsFrame.Size = UDim2.new(0, 150, 0, 80); statsFrame.Position = UDim2.new(0, 10, 0, 50); statsFrame.Visible = not isMobile; statsFrame.Parent = screenGui
@@ -350,7 +350,6 @@ local pingLabel = Instance.new("TextLabel", statsFrame); pingLabel.Size=UDim2.ne
 local playersCountLabel = Instance.new("TextLabel", statsFrame); playersCountLabel.Size=UDim2.new(1,-10,0,20); playersCountLabel.Position=UDim2.new(0,10,0,25); playersCountLabel.BackgroundTransparency=1; playersCountLabel.Text="Players: --"; playersCountLabel.TextColor3=THEME_AKB_BLUE; playersCountLabel.Font=Enum.Font.GothamMedium; playersCountLabel.TextSize=14; playersCountLabel.TextXAlignment=Enum.TextXAlignment.Left
 local nonFriendsLabel = Instance.new("TextLabel", statsFrame); nonFriendsLabel.Size=UDim2.new(1,-10,0,20); nonFriendsLabel.Position=UDim2.new(0,10,0,45); nonFriendsLabel.BackgroundTransparency=1; nonFriendsLabel.Text="Enemies: --"; nonFriendsLabel.TextColor3=COLOR_NON_FRIEND; nonFriendsLabel.Font=Enum.Font.GothamMedium; nonFriendsLabel.TextSize=14; nonFriendsLabel.TextXAlignment=Enum.TextXAlignment.Left
 
--- Server Hop & Name & List UI (Simplified creation)
 local nameContainer = Instance.new("Frame", screenGui); nameContainer.Visible=false; nameContainer.Size=UDim2.new(0.8,0,0.6,0); nameContainer.Position=UDim2.new(0.1,0,0.2,0); nameContainer.BackgroundColor3=THEME_PURPLE; makeDraggable(nameContainer)
 Instance.new("UICorner", nameContainer).CornerRadius=UDim.new(0,20)
 local myAvatarBig = Instance.new("ImageLabel", nameContainer); myAvatarBig.Size=UDim2.new(0.4,0,0.8,0); myAvatarBig.Position=UDim2.new(0.05,0,0.1,0); myAvatarBig.BackgroundTransparency=1; myAvatarBig.ScaleType=Enum.ScaleType.Fit
@@ -377,16 +376,21 @@ Instance.new("UICorner", resetButton).CornerRadius=UDim.new(0,8)
 -- ==========================================================
 -- Main Logic
 -- ==========================================================
-local function toggleFreeCam()
+toggleFreeCam = function()
     isFreeCamEnabled = not isFreeCamEnabled
     if isFreeCamEnabled then
+        -- ถ้ากด FreeCam ให้ยกเลิก Spectate ก่อน
+        if spectatingPlayer then
+            spectatingPlayer = nil
+            camera.CameraSubject = localPlayer.Character and localPlayer.Character:FindFirstChild("Humanoid") or nil
+        end
+        
         freeCamButton.Text = isMobile and "📷 กล้อง: เปิด" or "📷 กล้อง: เปิด (Z)"
         freeCamButton.UIStroke.Color = Color3.fromRGB(255, 100, 255)
         camera.CameraType = Enum.CameraType.Scriptable
         
         if isMobile then
             mobileCamFrame.Visible = true
-            -- Reset rotation vars to current camera to prevent snap
             local rx, ry, rz = camera.CFrame:ToEulerAnglesYXZ()
             camRotX, camRotY = rx, ry
         end
@@ -407,11 +411,16 @@ local function toggleFreeCam()
     end
 end
 freeCamButton.MouseButton1Click:Connect(toggleFreeCam)
+
 resetButton.MouseButton1Click:Connect(function() 
     if localPlayer.Character then 
         camera.CameraSubject = localPlayer.Character:FindFirstChild("Humanoid")
-        spectatingPlayer = nil; resetButton.Visible = false; camera.CameraType = Enum.CameraType.Custom
+        spectatingPlayer = nil
+        resetButton.Visible = false
+        camera.CameraType = Enum.CameraType.Custom
+        
         if Controls then Controls:Enable() end
+        
         isFreeCamEnabled = false
         mobileCamFrame.Visible = false
         freeCamButton.Text = isMobile and "📷 กล้อง: ปิด" or "📷 กล้อง: ปิด (Z)"
@@ -438,7 +447,28 @@ updatePlayerList = function()
         if txt=="" or string.find(string.lower(p.Name), txt) then
             local b = Instance.new("TextButton", listFrame); b.Size=UDim2.new(1,-4,0,40); b.BackgroundColor3=THEME_PURPLE; b.BackgroundTransparency=0.5; b.Text=p.DisplayName; b.TextColor3=THEME_WHITE; b.Font=Enum.Font.GothamMedium; b.TextSize=14
             Instance.new("UICorner", b).CornerRadius=UDim.new(0,6)
-            b.MouseButton1Click:Connect(function() if p.Character and p.Character:FindFirstChild("Humanoid") then camera.CameraSubject=p.Character.Humanoid; spectatingPlayer=p; resetButton.Visible=true end end)
+            
+            -- [EDIT] แก้ไข Logic คลิกชื่อ: ปิด FreeCam และล็อคกล้องทันที
+            b.MouseButton1Click:Connect(function() 
+                if p.Character and p.Character:FindFirstChild("Humanoid") then
+                    -- 1. ปิด FreeCam ถ้าเปิดอยู่
+                    if isFreeCamEnabled then
+                        isFreeCamEnabled = false
+                        mobileCamFrame.Visible = false
+                        freeCamButton.Text = isMobile and "📷 กล้อง: ปิด" or "📷 กล้อง: ปิด (Z)"
+                        freeCamButton.UIStroke.Color = THEME_FREECAM
+                    end
+                    
+                    -- 2. ตั้งค่ากล้องให้ส่อง
+                    camera.CameraType = Enum.CameraType.Custom
+                    camera.CameraSubject = p.Character.Humanoid
+                    spectatingPlayer = p
+                    
+                    -- 3. ปิดการเดินเรา และโชว์ปุ่มกลับร่าง
+                    if Controls then Controls:Disable() end
+                    resetButton.Visible = true 
+                end 
+            end)
         end
     end
 end
@@ -450,6 +480,21 @@ UserInputService.InputBegan:Connect(function(i, gp)
 end)
 
 RunService.RenderStepped:Connect(function(dt)
+    -- [EDIT] เพิ่ม Logic ล็อคกล้อง Spectate ให้แน่นขึ้น (กันหลุด)
+    if spectatingPlayer then
+        if spectatingPlayer.Character and spectatingPlayer.Character:FindFirstChild("Humanoid") then
+             if camera.CameraSubject ~= spectatingPlayer.Character.Humanoid then
+                 camera.CameraSubject = spectatingPlayer.Character.Humanoid
+             end
+        else
+            -- ถ้าเป้าหมายตายหรือหายไป ให้กลับร่าง
+            spectatingPlayer = nil
+            if localPlayer.Character then
+                camera.CameraSubject = localPlayer.Character:FindFirstChild("Humanoid")
+            end
+        end
+    end
+
     if isFreeCamEnabled then
         local moveVec = Vector3.new()
         
@@ -461,23 +506,18 @@ RunService.RenderStepped:Connect(function(dt)
         if UserInputService:IsKeyDown(Enum.KeyCode.Q) then moveVec = moveVec + Vector3.new(0,-1,0) end
         if UserInputService:IsKeyDown(Enum.KeyCode.E) then moveVec = moveVec + Vector3.new(0,1,0) end
         
-        -- Mobile Input (Add on top)
+        -- Mobile Input
         moveVec = moveVec + mobileInput
         
         local currentSpeed = 60
         if UserInputService:IsKeyDown(Enum.KeyCode.LeftShift) then currentSpeed = 150 end
         
-        -- Camera Rotation Logic
+        -- Camera Rotation
         local rotCFrame
         if isMobile then
-             -- Clamp Pitch
              camRotX = math.clamp(camRotX, math.rad(-89), math.rad(89))
              rotCFrame = CFrame.fromEulerAnglesYXZ(camRotX, camRotY, 0)
         else
-             -- PC Mouse Logic would go here (handled by standard mouse delta usually, simplified for mixed script)
-             -- If pure PC, usually use InputChanged delta. For this script, we assume PC mouse look works via Right Click drag 
-             -- from previous logic or standard Roblox behavior if Type is Scriptable but we handle CFrame.
-             -- Let's stick to the mobile touch logic primarily as requested.
              rotCFrame = camera.CFrame.Rotation
         end
 
