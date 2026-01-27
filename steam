@@ -1,4 +1,4 @@
-local VERSION = "AKB 1.4" -- ปรับขนาดชื่อเล็ก + แก้คลิกส่อง + ชื่อเรากลางจอ
+local VERSION = "AKB 1.6" -- โชว์ Mutual/Server Friends ใน Spectate + แก้ไขสถานะ
 
 if not game:IsLoaded() then
     game.Loaded:Wait()
@@ -9,7 +9,6 @@ local RunService = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")
 local UserInputService = game:GetService("UserInputService")
 local TeleportService = game:GetService("TeleportService")
-local HttpService = game:GetService("HttpService")
 local StarterGui = game:GetService("StarterGui")
 local Lighting = game:GetService("Lighting")
 
@@ -43,10 +42,26 @@ optimizePerformance()
 
 -- ประกาศตัวแปรล่วงหน้า
 local updatePlayerList
-local updateListSelection
 local showMutualFriends
 local mobileInput = Vector3.new(0, 0, 0) 
-local toggleFreeCam -- ประกาศฟังก์ชันล่วงหน้า
+local toggleFreeCam 
+local spectatingPlayer = nil 
+local lastSpectatingPlayer = nil -- [NEW] เช็คว่าเปลี่ยนคนส่องหรือยัง
+local friendStatus = {} 
+local blockedStatus = {} 
+local myFriendsCache = nil -- [NEW] Cache เพื่อนเรา
+
+-- สี Theme
+local THEME_MAIN = Color3.fromRGB(0, 190, 255) 
+local COLOR_ENEMY = Color3.fromRGB(255, 40, 40)
+local THEME_PURPLE = Color3.fromRGB(30, 30, 45) 
+local THEME_DARK_BG = Color3.fromRGB(20, 25, 35)
+local THEME_WHITE = Color3.fromRGB(240, 240, 240)
+local THEME_SELECTED = Color3.fromRGB(255, 150, 50) 
+local THEME_AKB_BLUE = Color3.fromRGB(0, 240, 255) 
+local THEME_HOP = Color3.fromRGB(0, 255, 128)
+local THEME_FREECAM = Color3.fromRGB(170, 0, 255) 
+local COLOR_BLOCKED_USER = Color3.fromRGB(70, 70, 70) 
 
 pcall(function()
     StarterGui:SetCore("SendNotification", {
@@ -67,26 +82,24 @@ localPlayer.CameraMaxZoomDistance = 100000
 local isEspEnabled = false
 local isPlayerListVisible = false
 local isFreeCamEnabled = false 
-local spectatingPlayer = nil 
 
-local friendStatus = {} 
-local blockedStatus = {} 
-
--- สี Theme
-local THEME_MAIN = Color3.fromRGB(0, 190, 255) 
-local COLOR_ENEMY = Color3.fromRGB(255, 40, 40)
-local THEME_PURPLE = Color3.fromRGB(30, 30, 45) 
-local THEME_DARK_BG = Color3.fromRGB(20, 25, 35)
-local THEME_GLOW = Color3.fromRGB(180, 230, 255) 
-local THEME_WHITE = Color3.fromRGB(240, 240, 240)
-local THEME_SELECTED = Color3.fromRGB(255, 150, 50) 
-local THEME_AKB_BLUE = Color3.fromRGB(0, 240, 255) 
-local THEME_HOP = Color3.fromRGB(0, 255, 128)
-local THEME_FREECAM = Color3.fromRGB(170, 0, 255) 
-local COLOR_BLOCKED_USER = Color3.fromRGB(70, 70, 70) 
-local COLOR_NON_FRIEND = Color3.fromRGB(255, 40, 40)
-local HEALTH_COLOR_FULL = Color3.fromRGB(85, 255, 127) 
-local HEALTH_COLOR_LOW = Color3.fromRGB(255, 85, 85)    
+-- [NEW] ฟังก์ชันโหลดเพื่อนเรา (Cache)
+local function ensureMyFriends()
+    if myFriendsCache then return end
+    task.spawn(function()
+        local friends = {}
+        local success, pages = pcall(function() return Players:GetFriendsAsync(localPlayer.UserId) end)
+        if success then
+            while true do
+                for _, item in ipairs(pages:GetCurrentPage()) do friends[item.Id] = true end
+                if pages.IsFinished then break end
+                pages:AdvanceToNextPageAsync()
+            end
+            myFriendsCache = friends
+        end
+    end)
+end
+ensureMyFriends() -- เรียกครั้งแรก
 
 -- ฟังก์ชันลาก UI (Draggable)
 local function makeDraggable(frame)
@@ -169,7 +182,7 @@ local topCenterLabel = Instance.new("TextLabel")
 topCenterLabel.Name = "MyNameLabel"
 topCenterLabel.Text = "@" .. localPlayer.Name
 topCenterLabel.Size = UDim2.new(0, 300, 0, 30)
-topCenterLabel.Position = UDim2.new(0.5, -150, 0, 5) -- กลางบน
+topCenterLabel.Position = UDim2.new(0.5, -150, 0, 5)
 topCenterLabel.BackgroundTransparency = 1
 topCenterLabel.TextColor3 = THEME_WHITE
 topCenterLabel.Font = Enum.Font.GothamBold
@@ -178,20 +191,50 @@ topCenterLabel.TextStrokeTransparency = 0.5
 topCenterLabel.Parent = screenGui
 
 -- ==========================================================
--- [NEW] ชื่อคนที่เรากำลังส่อง (ซ้ายล่าง)
+-- [NEW] Spectate UI Frame (Left Bottom)
 -- ==========================================================
-local spectateLabel = Instance.new("TextLabel")
-spectateLabel.Name = "SpectateStatus"
-spectateLabel.Text = ""
-spectateLabel.Size = UDim2.new(0, 300, 0, 30)
-spectateLabel.Position = UDim2.new(0, 20, 1, -40) -- ซ้ายล่าง
-spectateLabel.BackgroundTransparency = 1
-spectateLabel.TextColor3 = THEME_SELECTED
-spectateLabel.Font = Enum.Font.GothamBold
-spectateLabel.TextSize = 18
-spectateLabel.TextStrokeTransparency = 0.5
-spectateLabel.TextXAlignment = Enum.TextXAlignment.Left
-spectateLabel.Parent = screenGui
+local spectateFrame = Instance.new("Frame")
+spectateFrame.Name = "SpectateFrame"
+spectateFrame.Size = UDim2.new(0, 240, 0, 90) -- ขยายขนาดนิดหน่อย
+spectateFrame.Position = UDim2.new(0, 20, 1, -100)
+spectateFrame.BackgroundColor3 = THEME_DARK_BG
+spectateFrame.BackgroundTransparency = 0.3
+spectateFrame.Visible = false
+spectateFrame.Parent = screenGui
+
+local sfCorner = Instance.new("UICorner", spectateFrame); sfCorner.CornerRadius = UDim.new(0,10)
+local sfStroke = Instance.new("UIStroke", spectateFrame); sfStroke.Color = THEME_SELECTED; sfStroke.Thickness = 2
+
+local spName = Instance.new("TextLabel", spectateFrame)
+spName.Size = UDim2.new(1, -10, 0, 25)
+spName.Position = UDim2.new(0, 10, 0, 5)
+spName.BackgroundTransparency = 1
+spName.TextColor3 = THEME_WHITE
+spName.Font = Enum.Font.GothamBold
+spName.TextSize = 16
+spName.TextXAlignment = Enum.TextXAlignment.Left
+spName.Text = "Name"
+
+-- [EDIT] Label สำหรับ Mutual/Server Friends
+local spStatus = Instance.new("TextLabel", spectateFrame)
+spStatus.Size = UDim2.new(1, -10, 0, 20)
+spStatus.Position = UDim2.new(0, 10, 0, 30)
+spStatus.BackgroundTransparency = 1
+spStatus.TextColor3 = Color3.fromRGB(200, 200, 200)
+spStatus.Font = Enum.Font.Gotham
+spStatus.TextSize = 13
+spStatus.TextXAlignment = Enum.TextXAlignment.Left
+spStatus.Text = "Checking info..."
+
+local spBlockBtn = Instance.new("TextButton", spectateFrame)
+spBlockBtn.Size = UDim2.new(0, 100, 0, 25)
+spBlockBtn.Position = UDim2.new(0, 10, 0, 55)
+spBlockBtn.BackgroundColor3 = Color3.fromRGB(50, 50, 60)
+spBlockBtn.TextColor3 = THEME_WHITE
+spBlockBtn.Font = Enum.Font.GothamMedium
+spBlockBtn.TextSize = 12
+spBlockBtn.Text = "🛡️ Block"
+Instance.new("UICorner", spBlockBtn).CornerRadius = UDim.new(0,6)
 
 -- ==========================================================
 -- ปุ่มเมนูหลัก (Toggle Button) & Version Label
@@ -211,7 +254,6 @@ local tmStroke = Instance.new("UIStroke", toggleMenuBtn)
 tmStroke.Color = THEME_AKB_BLUE
 tmStroke.Thickness = 2
 
--- Version Label
 local verLabel = Instance.new("TextLabel")
 verLabel.Text = VERSION
 verLabel.Size = UDim2.new(0, 60, 0, 20)
@@ -223,10 +265,9 @@ verLabel.TextStrokeTransparency = 0.5
 verLabel.TextSize = 12
 verLabel.Parent = toggleMenuBtn
 
--- Button Container
 local buttonContainer = Instance.new("ScrollingFrame")
 buttonContainer.Name = "ButtonContainer"
-buttonContainer.Size = UDim2.new(0, 200, 0, 220) -- ลดความสูงลงเพราะเอาปุ่มชื่อออก
+buttonContainer.Size = UDim2.new(0, 200, 0, 220)
 buttonContainer.Position = UDim2.new(0, 70, 0.5, -110)
 buttonContainer.BackgroundColor3 = THEME_DARK_BG
 buttonContainer.BackgroundTransparency = 0.2
@@ -266,13 +307,12 @@ local function createFantasyButton(name, text, color)
 end
 
 local freeCamButton = createFantasyButton("FreeCamButton", "📷 กล้องอิสระ (Z)", THEME_FREECAM) 
--- [REMOVED] ปุ่มจารึกชื่อ (NameButton) ออกตามคำขอ
 local espButton = createFantasyButton("EspButton", "⚔️ เนตรเวทย์ (X)", Color3.fromRGB(200, 60, 60))
 local hopButton = createFantasyButton("HopButton", "⚡ ย้ายเซิร์ฟ", THEME_HOP)
 local listButton = createFantasyButton("ListButton", "👥 คณะเดินทาง", THEME_MAIN)
 
 -- ==========================================================
--- [NEW] Mobile FreeCam Controls UI (Left Side)
+-- [NEW] Mobile FreeCam Controls UI
 -- ==========================================================
 local mobileCamFrame = Instance.new("Frame")
 mobileCamFrame.Name = "MobileCamControls"
@@ -343,18 +383,25 @@ createUD("⬇", UDim2.new(0,0,0.5,0), -1)
 
 local touchSens = 0.6
 local camRotX, camRotY = 0, 0
+local touchLookActive = false -- [FIX] ใช้ตัวแปรคุมแทนปุ่มบังหน้าจอ
 
-local touchPanel = Instance.new("TextButton")
-touchPanel.Name = "TouchLookZone"
-touchPanel.Size = UDim2.new(1, 0, 1, 0)
-touchPanel.BackgroundTransparency = 1
-touchPanel.Text = ""
-touchPanel.ZIndex = -1 
-touchPanel.Parent = mobileCamFrame
+UserInputService.InputBegan:Connect(function(input, gameProcessed)
+    if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then
+        if not gameProcessed and isFreeCamEnabled then
+            touchLookActive = true
+        end
+    end
+end)
 
-touchPanel.InputChanged:Connect(function(input)
+UserInputService.InputEnded:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then
+        touchLookActive = false
+    end
+end)
+
+UserInputService.InputChanged:Connect(function(input, gameProcessed)
     if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseMovement then
-        if isFreeCamEnabled then
+        if isFreeCamEnabled and touchLookActive then
             local delta = input.Delta
             camRotX = camRotX - math.rad(delta.Y * touchSens)
             camRotY = camRotY - math.rad(delta.X * touchSens)
@@ -363,7 +410,94 @@ touchPanel.InputChanged:Connect(function(input)
 end)
 
 -- ==========================================================
--- Other UI Elements (Hop, Stats, etc)
+-- [NEW] Mutual Friends & Server Friends UI (Restored)
+-- ==========================================================
+local mutualFrame = Instance.new("Frame")
+mutualFrame.Name = "MutualFriends_Popup"
+mutualFrame.Size = UDim2.new(0, 300, 0, 350)
+mutualFrame.Position = UDim2.new(0.5, -150, 0.5, -175) 
+mutualFrame.BackgroundColor3 = Color3.fromRGB(15, 15, 25) 
+mutualFrame.BackgroundTransparency = 0.05
+mutualFrame.Visible = false
+mutualFrame.Parent = screenGui
+makeDraggable(mutualFrame)
+
+local mfCorner = Instance.new("UICorner", mutualFrame); mfCorner.CornerRadius = UDim.new(0, 12)
+local mfStroke = Instance.new("UIStroke", mutualFrame); mfStroke.Color = THEME_MAIN; mfStroke.Thickness = 3
+local mfHeader = Instance.new("TextLabel", mutualFrame); mfHeader.Text = "Friends List"; mfHeader.Size = UDim2.new(1,0,0,40); mfHeader.BackgroundTransparency = 1; mfHeader.TextColor3 = THEME_WHITE; mfHeader.Font = Enum.Font.GothamBold; mfHeader.TextSize = 18
+local mfClose = Instance.new("TextButton", mutualFrame); mfClose.Text = "X"; mfClose.TextColor3 = Color3.fromRGB(255,80,80); mfClose.BackgroundTransparency = 1; mfClose.Size = UDim2.new(0,40,0,40); mfClose.Position = UDim2.new(1,-40,0,0); mfClose.Font = Enum.Font.GothamBlack; mfClose.TextSize = 20
+mfClose.MouseButton1Click:Connect(function() mutualFrame.Visible = false end)
+
+local mfList = Instance.new("ScrollingFrame", mutualFrame)
+mfList.Size = UDim2.new(0.9, 0, 0.85, -40)
+mfList.Position = UDim2.new(0.05, 0, 0.12, 0)
+mfList.BackgroundTransparency = 1
+Instance.new("UIListLayout", mfList).SortOrder = Enum.SortOrder.LayoutOrder
+
+showMutualFriends = function(targetPlayer)
+    if not targetPlayer then return end
+    mutualFrame.Visible = true
+    for _,c in pairs(mfList:GetChildren()) do if c:IsA("TextButton") or c:IsA("TextLabel") then c:Destroy() end end
+    
+    local loading = Instance.new("TextLabel", mfList); loading.Text = "Scanning..."; loading.Size = UDim2.new(1,0,0,30); loading.TextColor3 = THEME_SELECTED; loading.BackgroundTransparency = 1
+    
+    task.spawn(function()
+        ensureMyFriends()
+        
+        local mutuals = {}
+        local targetFriends = {}
+        local s, pages = pcall(function() return Players:GetFriendsAsync(targetPlayer.UserId) end)
+        
+        if s then
+            while true do
+                for _, item in ipairs(pages:GetCurrentPage()) do table.insert(targetFriends, item) end
+                if pages.IsFinished then break end
+                pages:AdvanceToNextPageAsync()
+            end
+        else
+            loading.Text = "Profile is Private"
+            return
+        end
+        
+        for _, f in ipairs(targetFriends) do
+            if myFriendsCache and myFriendsCache[f.Id] then table.insert(mutuals, f) end
+        end
+        
+        if loading then loading:Destroy() end
+        
+        local function addHeader(text)
+            local h = Instance.new("TextLabel", mfList); h.Text = text; h.Size = UDim2.new(1,0,0,25); h.TextColor3 = THEME_MAIN; h.BackgroundTransparency = 1; h.Font = Enum.Font.GothamBold; h.TextXAlignment = Enum.TextXAlignment.Left
+        end
+        
+        addHeader("Mutual Friends ("..#mutuals..")")
+        for _, m in ipairs(mutuals) do
+            local btn = Instance.new("TextButton", mfList); btn.Text = m.Username; btn.Size = UDim2.new(1,0,0,30); btn.BackgroundColor3 = Color3.fromRGB(40,40,50); btn.TextColor3 = THEME_WHITE
+            Instance.new("UICorner", btn).CornerRadius = UDim.new(0,6)
+        end
+        
+        -- Friends in Server
+        local serverFriends = {}
+        for _, p in ipairs(Players:GetPlayers()) do
+             for _, tf in ipairs(targetFriends) do
+                 if p.UserId == tf.Id then table.insert(serverFriends, p) end
+             end
+        end
+        
+        addHeader("Friends in Server ("..#serverFriends..")")
+        for _, p in ipairs(serverFriends) do
+             local btn = Instance.new("TextButton", mfList); btn.Text = p.DisplayName; btn.Size = UDim2.new(1,0,0,30); btn.BackgroundColor3 = Color3.fromRGB(0,100,50); btn.TextColor3 = THEME_WHITE
+             Instance.new("UICorner", btn).CornerRadius = UDim.new(0,6)
+             btn.MouseButton1Click:Connect(function()
+                  mutualFrame.Visible = false
+                  camera.CameraSubject = p.Character and p.Character:FindFirstChild("Humanoid")
+                  spectatingPlayer = p
+             end)
+        end
+    end)
+end
+
+-- ==========================================================
+-- Other UI Elements
 -- ==========================================================
 local statsFrame = Instance.new("Frame")
 statsFrame.Name = "StatsDisplay"
@@ -375,8 +509,6 @@ Instance.new("UIStroke", statsFrame).Color = THEME_MAIN
 local pingLabel = Instance.new("TextLabel", statsFrame); pingLabel.Size=UDim2.new(1,-10,0,20); pingLabel.Position=UDim2.new(0,10,0,5); pingLabel.BackgroundTransparency=1; pingLabel.Text="Ping: --"; pingLabel.TextColor3=THEME_WHITE; pingLabel.Font=Enum.Font.GothamBold; pingLabel.TextSize=14; pingLabel.TextXAlignment=Enum.TextXAlignment.Left
 local playersCountLabel = Instance.new("TextLabel", statsFrame); playersCountLabel.Size=UDim2.new(1,-10,0,20); playersCountLabel.Position=UDim2.new(0,10,0,25); playersCountLabel.BackgroundTransparency=1; playersCountLabel.Text="Players: --"; playersCountLabel.TextColor3=THEME_AKB_BLUE; playersCountLabel.Font=Enum.Font.GothamMedium; playersCountLabel.TextSize=14; playersCountLabel.TextXAlignment=Enum.TextXAlignment.Left
 local nonFriendsLabel = Instance.new("TextLabel", statsFrame); nonFriendsLabel.Size=UDim2.new(1,-10,0,20); nonFriendsLabel.Position=UDim2.new(0,10,0,45); nonFriendsLabel.BackgroundTransparency=1; nonFriendsLabel.Text="Enemies: --"; nonFriendsLabel.TextColor3=COLOR_NON_FRIEND; nonFriendsLabel.Font=Enum.Font.GothamMedium; nonFriendsLabel.TextSize=14; nonFriendsLabel.TextXAlignment=Enum.TextXAlignment.Left
-
--- [REMOVED] nameContainer (จารึกชื่อ) ออก
 
 local serverHopFrame = Instance.new("Frame", screenGui); serverHopFrame.Visible=false; serverHopFrame.Size=UDim2.new(0,300,0,300); serverHopFrame.Position=UDim2.new(0.5,-150,0.5,-150); serverHopFrame.BackgroundColor3=THEME_DARK_BG; makeDraggable(serverHopFrame)
 Instance.new("UICorner", serverHopFrame).CornerRadius=UDim.new(0,15)
@@ -403,7 +535,7 @@ toggleFreeCam = function()
     if isFreeCamEnabled then
         if spectatingPlayer then
             spectatingPlayer = nil
-            spectateLabel.Text = "" -- Clear text
+            spectateFrame.Visible = false
             camera.CameraSubject = localPlayer.Character and localPlayer.Character:FindFirstChild("Humanoid") or nil
         end
         
@@ -438,7 +570,7 @@ resetButton.MouseButton1Click:Connect(function()
     if localPlayer.Character then 
         camera.CameraSubject = localPlayer.Character:FindFirstChild("Humanoid")
         spectatingPlayer = nil
-        spectateLabel.Text = "" -- Clear text
+        spectateFrame.Visible = false
         resetButton.Visible = false
         camera.CameraType = Enum.CameraType.Custom
         
@@ -467,7 +599,6 @@ updatePlayerList = function()
     local txt = string.lower(searchBox.Text)
     for _, p in ipairs(Players:GetPlayers()) do
         if txt=="" or string.find(string.lower(p.Name), txt) then
-            -- Main Entry Button (Spectate)
             local b = Instance.new("TextButton", listFrame)
             b.Size = UDim2.new(1, -4, 0, 45)
             b.BackgroundColor3 = THEME_PURPLE
@@ -476,9 +607,8 @@ updatePlayerList = function()
             b.AutoButtonColor = false
             Instance.new("UICorner", b).CornerRadius = UDim.new(0, 6)
 
-            -- Name Label
             local nm = Instance.new("TextLabel", b)
-            nm.Size = UDim2.new(1, -50, 1, 0)
+            nm.Size = UDim2.new(1, -80, 1, 0) 
             nm.Position = UDim2.new(0, 10, 0, 0)
             nm.BackgroundTransparency = 1
             nm.Text = p.DisplayName
@@ -487,7 +617,6 @@ updatePlayerList = function()
             nm.TextSize = 14
             nm.TextXAlignment = Enum.TextXAlignment.Left
 
-            -- Spectate Logic
             b.MouseButton1Click:Connect(function() 
                 if p.Character and p.Character:FindFirstChild("Humanoid") then
                     if isFreeCamEnabled then
@@ -504,11 +633,22 @@ updatePlayerList = function()
                 end 
             end)
 
-            -- Block Button
             if p ~= localPlayer then
+                -- Mutual Friend Button
+                local mfBtn = Instance.new("TextButton", b)
+                mfBtn.Size = UDim2.new(0, 30, 0, 30)
+                mfBtn.Position = UDim2.new(1, -75, 0.5, -15)
+                mfBtn.BackgroundColor3 = THEME_DARK_BG
+                mfBtn.TextColor3 = THEME_AKB_BLUE
+                mfBtn.Text = "👥"
+                mfBtn.Font = Enum.Font.GothamBold
+                Instance.new("UICorner", mfBtn).CornerRadius = UDim.new(0,6)
+                mfBtn.MouseButton1Click:Connect(function() showMutualFriends(p) end)
+
+                -- Block Button
                 local blk = Instance.new("TextButton", b)
-                blk.Size = UDim2.new(0, 35, 0, 35)
-                blk.Position = UDim2.new(1, -40, 0.5, -17.5)
+                blk.Size = UDim2.new(0, 30, 0, 30)
+                blk.Position = UDim2.new(1, -35, 0.5, -15)
                 blk.BackgroundColor3 = THEME_DARK_BG
                 blk.BackgroundTransparency = 0.5
                 blk.Font = Enum.Font.GothamBold
@@ -521,11 +661,8 @@ updatePlayerList = function()
 
                 blk.MouseButton1Click:Connect(function()
                     pcall(function()
-                        if blockedStatus[p.UserId] then
-                            StarterGui:SetCore("PromptUnblockPlayer", p)
-                        else
-                            StarterGui:SetCore("PromptBlockPlayer", p)
-                        end
+                        if blockedStatus[p.UserId] then StarterGui:SetCore("PromptUnblockPlayer", p)
+                        else StarterGui:SetCore("PromptBlockPlayer", p) end
                     end)
                 end)
             end
@@ -541,20 +678,79 @@ end)
 
 RunService.RenderStepped:Connect(function(dt)
     if spectatingPlayer then
-        spectateLabel.Text = "กำลังส่อง: " .. spectatingPlayer.DisplayName -- [NEW] แสดงชื่อคนที่เราส่อง
+        spectateFrame.Visible = true
+        spName.Text = spectatingPlayer.DisplayName
+        
+        -- [EDIT] Update Block Button text based on status
+        if blockedStatus[spectatingPlayer.UserId] then
+             spBlockBtn.Text = "🚫 Unblock"
+             spBlockBtn.TextColor3 = Color3.fromRGB(255, 100, 100)
+        else
+             spBlockBtn.Text = "🛡️ Block"
+             spBlockBtn.TextColor3 = THEME_WHITE
+        end
+        
+        -- [EDIT] Logic: Check if we are looking at a new person or just switched
+        if spectatingPlayer ~= lastSpectatingPlayer then
+             lastSpectatingPlayer = spectatingPlayer
+             spStatus.Text = "Loading stats..."
+             
+             -- Background Fetch
+             task.spawn(function()
+                 local target = spectatingPlayer
+                 if not target then return end
+                 
+                 ensureMyFriends()
+                 
+                 local mutualCount = 0
+                 local serverCount = 0
+                 
+                 local s, pages = pcall(function() return Players:GetFriendsAsync(target.UserId) end)
+                 if not s then
+                    if spectatingPlayer == target then spStatus.Text = "Private Profile" end
+                    return
+                 end
+                 
+                 local targetFriends = {}
+                 while true do
+                    for _, item in ipairs(pages:GetCurrentPage()) do table.insert(targetFriends, item) end
+                    if pages.IsFinished then break end
+                    pages:AdvanceToNextPageAsync()
+                 end
+                 
+                 for _, f in ipairs(targetFriends) do
+                     if myFriendsCache and myFriendsCache[f.Id] then mutualCount = mutualCount + 1 end
+                     if Players:GetPlayerByUserId(f.Id) then serverCount = serverCount + 1 end
+                 end
+                 
+                 if spectatingPlayer == target then
+                     spStatus.Text = "Mutuals: " .. mutualCount .. " | In Server: " .. serverCount
+                 end
+             end)
+        end
+
+        spBlockBtn.MouseButton1Click:Connect(function()
+            pcall(function()
+                if blockedStatus[spectatingPlayer.UserId] then StarterGui:SetCore("PromptUnblockPlayer", spectatingPlayer)
+                else StarterGui:SetCore("PromptBlockPlayer", spectatingPlayer) end
+            end)
+        end)
+
         if spectatingPlayer.Character and spectatingPlayer.Character:FindFirstChild("Humanoid") then
              if camera.CameraSubject ~= spectatingPlayer.Character.Humanoid then
                  camera.CameraSubject = spectatingPlayer.Character.Humanoid
              end
         else
             spectatingPlayer = nil
-            spectateLabel.Text = ""
+            lastSpectatingPlayer = nil
+            spectateFrame.Visible = false
             if localPlayer.Character then
                 camera.CameraSubject = localPlayer.Character:FindFirstChild("Humanoid")
             end
         end
     else
-        spectateLabel.Text = ""
+        spectateFrame.Visible = false
+        lastSpectatingPlayer = nil
     end
 
     if isFreeCamEnabled then
@@ -588,11 +784,9 @@ RunService.RenderStepped:Connect(function(dt)
                 local bb = nameplates[p]
                 if not bb or bb.Adornee ~= head then
                     if bb then bb:Destroy() end
-                    -- [EDIT] ลดขนาดลงเล็กๆ เหมือนเดิม (100, 30)
                     bb = Instance.new("BillboardGui", espFolder); bb.Size=UDim2.new(0,100,0,30); bb.StudsOffset=Vector3.new(0,3,0); bb.AlwaysOnTop=true; bb.Adornee=head; bb.Name="ESP"
-                    bb.Active = true -- [FIX] เปิด Active เพื่อให้กดได้
+                    bb.Active = true 
                     
-                    -- [FIX] Click to Spectate on ESP
                     local clickBtn = Instance.new("TextButton", bb)
                     clickBtn.Size = UDim2.new(1,0,1,0)
                     clickBtn.BackgroundTransparency = 1
