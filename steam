@@ -1,4 +1,4 @@
-local VERSION = "AKB 1.8" -- แก้ไขปุ่มเมนูหลักกดยาก (Menu Button Fix)
+local VERSION = "AKB 1.9" -- เปลี่ยนเมนูเป็น Frame ปกติ แก้ปุ่มกดยาก
 
 if not game:IsLoaded() then
     game.Loaded:Wait()
@@ -15,14 +15,9 @@ local Lighting = game:GetService("Lighting")
 local localPlayer = Players.LocalPlayer
 local camera = workspace.CurrentCamera
 
--- ==========================================================
--- [CHECK] ตรวจสอบว่าเป็นมือถือหรือไม่
--- ==========================================================
 local isMobile = UserInputService.TouchEnabled and not UserInputService.MouseEnabled
 
--- ==========================================================
--- [OPTIMIZE] ระบบลดแล็ค
--- ==========================================================
+-- [OPTIMIZE]
 local function optimizePerformance()
     pcall(function()
         Lighting.GlobalShadows = false
@@ -40,7 +35,7 @@ local function optimizePerformance()
 end
 optimizePerformance()
 
--- ประกาศตัวแปรล่วงหน้า
+-- Variables
 local updatePlayerList
 local showMutualFriends
 local mobileInput = Vector3.new(0, 0, 0) 
@@ -51,7 +46,7 @@ local friendStatus = {}
 local blockedStatus = {} 
 local myFriendsCache = nil
 
--- สี Theme
+-- Colors
 local THEME_MAIN = Color3.fromRGB(0, 190, 255) 
 local COLOR_ENEMY = Color3.fromRGB(255, 40, 40)
 local THEME_PURPLE = Color3.fromRGB(30, 30, 45) 
@@ -83,7 +78,6 @@ local isEspEnabled = false
 local isPlayerListVisible = false
 local isFreeCamEnabled = false 
 
--- [NEW] ฟังก์ชันโหลดเพื่อนเรา (Cache)
 local function ensureMyFriends()
     if myFriendsCache then return end
     task.spawn(function()
@@ -101,7 +95,6 @@ local function ensureMyFriends()
 end
 ensureMyFriends()
 
--- ฟังก์ชันลาก UI (Draggable)
 local function makeDraggable(frame)
     frame.Active = true 
     local dragging, dragInput, dragStart, startPos
@@ -121,7 +114,6 @@ local function makeDraggable(frame)
     UserInputService.InputChanged:Connect(function(input) if input == dragInput and dragging then update(input) end end)
 end
 
--- เช็คเพื่อนและสถานะบล็อก
 local function checkFriendStatus(player)
     if player == localPlayer then return end
     task.spawn(function()
@@ -162,7 +154,7 @@ task.spawn(function()
 end)
 for _, p in ipairs(Players:GetPlayers()) do checkFriendStatus(p) end
 
--- สร้าง GUI
+-- GUI Setup
 local oldGui = localPlayer:WaitForChild("PlayerGui"):FindFirstChild("FantasyESP_Gui")
 if oldGui then oldGui:Destroy() end
 
@@ -176,9 +168,7 @@ screenGui.DisplayOrder = 10
 local espFolder = Instance.new("Folder", screenGui)
 espFolder.Name = "ESP_Container"
 
--- ==========================================================
--- ชื่อเราตรงกลางบน
--- ==========================================================
+-- Name Label
 local topCenterLabel = Instance.new("TextLabel")
 topCenterLabel.Name = "MyNameLabel"
 topCenterLabel.Text = "@" .. localPlayer.Name
@@ -191,9 +181,7 @@ topCenterLabel.TextSize = 18
 topCenterLabel.TextStrokeTransparency = 0.5
 topCenterLabel.Parent = screenGui
 
--- ==========================================================
--- Spectate UI Frame
--- ==========================================================
+-- Spectate Frame
 local spectateFrame = Instance.new("Frame")
 spectateFrame.Name = "SpectateFrame"
 spectateFrame.Size = UDim2.new(0, 240, 0, 90)
@@ -240,9 +228,7 @@ spBlockBtn.Text = "🛡️ Block"
 spBlockBtn.ZIndex = 11
 Instance.new("UICorner", spBlockBtn).CornerRadius = UDim.new(0,6)
 
--- ==========================================================
--- ปุ่มเมนูหลัก & Version
--- ==========================================================
+-- Menu Button
 local toggleMenuBtn = Instance.new("ImageButton")
 toggleMenuBtn.Name = "AKB_Toggle"
 toggleMenuBtn.BackgroundColor3 = THEME_DARK_BG
@@ -269,14 +255,14 @@ verLabel.TextStrokeTransparency = 0.5
 verLabel.TextSize = 12
 verLabel.Parent = toggleMenuBtn
 
-local buttonContainer = Instance.new("ScrollingFrame")
+-- [FIX] Change ButtonContainer from ScrollingFrame to Frame
+local buttonContainer = Instance.new("Frame")
 buttonContainer.Name = "ButtonContainer"
 buttonContainer.Size = UDim2.new(0, 200, 0, 220)
 buttonContainer.Position = UDim2.new(0, 70, 0.5, -110)
 buttonContainer.BackgroundColor3 = THEME_DARK_BG
 buttonContainer.BackgroundTransparency = 0.2
 buttonContainer.Visible = false
-buttonContainer.ScrollBarThickness = 4
 buttonContainer.Parent = screenGui
 
 local bcCorner = Instance.new("UICorner", buttonContainer)
@@ -287,12 +273,11 @@ local bcLayout = Instance.new("UIListLayout", buttonContainer)
 bcLayout.Padding = UDim.new(0, 5); bcLayout.SortOrder = Enum.SortOrder.LayoutOrder; bcLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
 local bcPadding = Instance.new("UIPadding", buttonContainer); bcPadding.PaddingTop = UDim.new(0, 10)
 
-toggleMenuBtn.MouseButton1Click:Connect(function()
+toggleMenuBtn.Activated:Connect(function()
     buttonContainer.Visible = not buttonContainer.Visible
     tmStroke.Color = buttonContainer.Visible and THEME_SELECTED or THEME_AKB_BLUE
 end)
 
--- [FIX] แก้ไขฟังก์ชันสร้างปุ่มให้เสถียรสำหรับมือถือ
 local function createFantasyButton(name, text, color)
     local btn = Instance.new("TextButton")
     btn.Name = name
@@ -301,15 +286,14 @@ local function createFantasyButton(name, text, color)
     btn.TextColor3 = THEME_WHITE; btn.BackgroundColor3 = THEME_DARK_BG
     btn.Size = UDim2.new(0, 180, 0, 40)
     btn.Font = Enum.Font.GothamBold; btn.TextSize = 14
-    btn.AutoButtonColor = false -- ปิด AutoColor ของ Roblox เพราะบางทีมันค้าง
-    btn.Active = true -- สำคัญสำหรับมือถือ
+    btn.AutoButtonColor = true
+    btn.Active = true 
+    btn.ZIndex = 5 -- Ensure it's above container
     btn.Parent = buttonContainer
     
     local c = Instance.new("UICorner", btn); c.CornerRadius = UDim.new(0, 8)
     local s = Instance.new("UIStroke", btn); s.Color = color or THEME_MAIN; s.Thickness = 2
     
-    -- [CHANGE] ลบการย่อ/ขยายปุ่มออก เพื่อป้องกันการยกเลิก Click โดยไม่ตั้งใจ
-    -- เปลี่ยนเป็นแค่เปลี่ยนสีชั่วคราวแทน
     return btn
 end
 
@@ -318,9 +302,7 @@ local espButton = createFantasyButton("EspButton", "⚔️ เนตรเวท
 local hopButton = createFantasyButton("HopButton", "⚡ ย้ายเซิร์ฟ", THEME_HOP)
 local listButton = createFantasyButton("ListButton", "👥 คณะเดินทาง", THEME_MAIN)
 
--- ==========================================================
--- Mobile FreeCam Controls UI
--- ==========================================================
+-- Mobile Cam Controls
 local mobileCamFrame = Instance.new("Frame")
 mobileCamFrame.Name = "MobileCamControls"
 mobileCamFrame.Size = UDim2.new(1, 0, 1, 0)
@@ -416,9 +398,7 @@ UserInputService.InputChanged:Connect(function(input, gameProcessed)
     end
 end)
 
--- ==========================================================
--- Mutual Friends & Server Friends UI (Restored)
--- ==========================================================
+-- Mutual Friends UI
 local mutualFrame = Instance.new("Frame")
 mutualFrame.Name = "MutualFriends_Popup"
 mutualFrame.Size = UDim2.new(0, 300, 0, 350)
@@ -505,9 +485,7 @@ showMutualFriends = function(targetPlayer)
     end)
 end
 
--- ==========================================================
--- Other UI Elements
--- ==========================================================
+-- Other Frames
 local statsFrame = Instance.new("Frame")
 statsFrame.Name = "StatsDisplay"
 statsFrame.BackgroundColor3 = THEME_DARK_BG; statsFrame.BackgroundTransparency = 0.3; statsFrame.Size = UDim2.new(0, 150, 0, 80); statsFrame.Position = UDim2.new(0, 10, 0, 50); statsFrame.Visible = not isMobile; statsFrame.Parent = screenGui
@@ -536,9 +514,7 @@ searchBox:GetPropertyChangedSignal("Text"):Connect(function() updatePlayerList()
 local resetButton = Instance.new("TextButton", screenGui); resetButton.Visible=false; resetButton.Text="👁️ กลับร่าง"; resetButton.Size=UDim2.new(0,80,0,35); resetButton.Position=UDim2.new(1,-90,0.7,0); resetButton.BackgroundColor3=THEME_DARK_BG; resetButton.TextColor3=THEME_WHITE; makeDraggable(resetButton)
 Instance.new("UICorner", resetButton).CornerRadius=UDim.new(0,8)
 
--- ==========================================================
 -- Main Logic
--- ==========================================================
 toggleFreeCam = function()
     isFreeCamEnabled = not isFreeCamEnabled
     if isFreeCamEnabled then
@@ -573,7 +549,7 @@ toggleFreeCam = function()
         resetButton.Visible = false
     end
 end
--- [FIX] Use Activated for main buttons
+
 freeCamButton.Activated:Connect(toggleFreeCam)
 resetButton.Activated:Connect(function() 
     if localPlayer.Character then 
@@ -605,16 +581,14 @@ updatePlayerList = function()
     local txt = string.lower(searchBox.Text)
     for _, p in ipairs(Players:GetPlayers()) do
         if txt=="" or string.find(string.lower(p.Name), txt) then
-            -- [FIX] Use Frame instead of TextButton as container
             local row = Instance.new("Frame", listFrame)
             row.Size = UDim2.new(1, -4, 0, 45)
             row.BackgroundColor3 = THEME_PURPLE
             row.BackgroundTransparency = 0.5
             Instance.new("UICorner", row).CornerRadius = UDim.new(0, 6)
 
-            -- Main Spectate Button (Fill background)
             local specBtn = Instance.new("TextButton", row)
-            specBtn.Size = UDim2.new(1, -80, 1, 0) -- Leave space for buttons
+            specBtn.Size = UDim2.new(1, -80, 1, 0)
             specBtn.BackgroundTransparency = 1
             specBtn.Text = ""
             specBtn.ZIndex = 2
@@ -647,7 +621,6 @@ updatePlayerList = function()
             end)
 
             if p ~= localPlayer then
-                -- Mutual Friend Button
                 local mfBtn = Instance.new("TextButton", row)
                 mfBtn.Size = UDim2.new(0, 30, 0, 30)
                 mfBtn.Position = UDim2.new(1, -75, 0.5, -15)
@@ -659,7 +632,6 @@ updatePlayerList = function()
                 Instance.new("UICorner", mfBtn).CornerRadius = UDim.new(0,6)
                 mfBtn.Activated:Connect(function() showMutualFriends(p) end)
 
-                -- Block Button
                 local blk = Instance.new("TextButton", row)
                 blk.Size = UDim2.new(0, 30, 0, 30)
                 blk.Position = UDim2.new(1, -35, 0.5, -15)
@@ -791,7 +763,6 @@ RunService.RenderStepped:Connect(function(dt)
                     if bb then bb:Destroy() end
                     bb = Instance.new("BillboardGui", espFolder); bb.Size=UDim2.new(0,100,0,30); bb.StudsOffset=Vector3.new(0,3,0); bb.AlwaysOnTop=true; bb.Adornee=head; bb.Name="ESP"
                     
-                    -- [FIX] Use Activated for mobile reliability
                     local clickBtn = Instance.new("TextButton", bb)
                     clickBtn.Size = UDim2.new(1,0,1,0)
                     clickBtn.BackgroundTransparency = 1
