@@ -1,4 +1,4 @@
-local VERSION = "AKB 1.3" -- กู้คืนระบบเดิม
+local VERSION = "AKB 1.4" -- ปรับขนาดชื่อเล็ก + แก้คลิกส่อง + ชื่อเรากลางจอ
 
 if not game:IsLoaded() then
     game.Loaded:Wait()
@@ -65,7 +65,6 @@ end)
 localPlayer.CameraMaxZoomDistance = 100000 
 
 local isEspEnabled = false
-local isNameVisible = false
 local isPlayerListVisible = false
 local isFreeCamEnabled = false 
 local spectatingPlayer = nil 
@@ -144,7 +143,6 @@ task.spawn(function()
                 end
             end
         end
-        -- อัปเดต List เพื่อโชว์สถานะบล็อกล่าสุด
         if isPlayerListVisible then updatePlayerList() end
     end
 end)
@@ -163,6 +161,37 @@ screenGui.DisplayOrder = 10
 
 local espFolder = Instance.new("Folder", screenGui)
 espFolder.Name = "ESP_Container"
+
+-- ==========================================================
+-- [NEW] ชื่อเราตรงกลางบน (@Username)
+-- ==========================================================
+local topCenterLabel = Instance.new("TextLabel")
+topCenterLabel.Name = "MyNameLabel"
+topCenterLabel.Text = "@" .. localPlayer.Name
+topCenterLabel.Size = UDim2.new(0, 300, 0, 30)
+topCenterLabel.Position = UDim2.new(0.5, -150, 0, 5) -- กลางบน
+topCenterLabel.BackgroundTransparency = 1
+topCenterLabel.TextColor3 = THEME_WHITE
+topCenterLabel.Font = Enum.Font.GothamBold
+topCenterLabel.TextSize = 18
+topCenterLabel.TextStrokeTransparency = 0.5
+topCenterLabel.Parent = screenGui
+
+-- ==========================================================
+-- [NEW] ชื่อคนที่เรากำลังส่อง (ซ้ายล่าง)
+-- ==========================================================
+local spectateLabel = Instance.new("TextLabel")
+spectateLabel.Name = "SpectateStatus"
+spectateLabel.Text = ""
+spectateLabel.Size = UDim2.new(0, 300, 0, 30)
+spectateLabel.Position = UDim2.new(0, 20, 1, -40) -- ซ้ายล่าง
+spectateLabel.BackgroundTransparency = 1
+spectateLabel.TextColor3 = THEME_SELECTED
+spectateLabel.Font = Enum.Font.GothamBold
+spectateLabel.TextSize = 18
+spectateLabel.TextStrokeTransparency = 0.5
+spectateLabel.TextXAlignment = Enum.TextXAlignment.Left
+spectateLabel.Parent = screenGui
 
 -- ==========================================================
 -- ปุ่มเมนูหลัก (Toggle Button) & Version Label
@@ -197,8 +226,8 @@ verLabel.Parent = toggleMenuBtn
 -- Button Container
 local buttonContainer = Instance.new("ScrollingFrame")
 buttonContainer.Name = "ButtonContainer"
-buttonContainer.Size = UDim2.new(0, 200, 0, 260)
-buttonContainer.Position = UDim2.new(0, 70, 0.5, -130)
+buttonContainer.Size = UDim2.new(0, 200, 0, 220) -- ลดความสูงลงเพราะเอาปุ่มชื่อออก
+buttonContainer.Position = UDim2.new(0, 70, 0.5, -110)
 buttonContainer.BackgroundColor3 = THEME_DARK_BG
 buttonContainer.BackgroundTransparency = 0.2
 buttonContainer.Visible = false
@@ -237,7 +266,7 @@ local function createFantasyButton(name, text, color)
 end
 
 local freeCamButton = createFantasyButton("FreeCamButton", "📷 กล้องอิสระ (Z)", THEME_FREECAM) 
-local nameButton = createFantasyButton("NameButton", "📜 จารึกชื่อ", Color3.fromRGB(60, 160, 220))
+-- [REMOVED] ปุ่มจารึกชื่อ (NameButton) ออกตามคำขอ
 local espButton = createFantasyButton("EspButton", "⚔️ เนตรเวทย์ (X)", Color3.fromRGB(200, 60, 60))
 local hopButton = createFantasyButton("HopButton", "⚡ ย้ายเซิร์ฟ", THEME_HOP)
 local listButton = createFantasyButton("ListButton", "👥 คณะเดินทาง", THEME_MAIN)
@@ -252,10 +281,8 @@ mobileCamFrame.BackgroundTransparency = 1
 mobileCamFrame.Visible = false
 mobileCamFrame.Parent = screenGui
 
--- Control Pad (Move to Bottom Left)
 local padFrame = Instance.new("Frame")
 padFrame.Size = UDim2.new(0, 150, 0, 150)
--- [EDIT] ย้ายมาซ้ายล่าง (เว้นระยะจากขอบนิดหน่อย)
 padFrame.Position = UDim2.new(0, 30, 1, -180) 
 padFrame.BackgroundTransparency = 1
 padFrame.Parent = mobileCamFrame
@@ -287,13 +314,11 @@ local function createCamBtn(text, pos, callbackPress, callbackRelease)
     end)
 end
 
--- ปุ่มควบคุมทิศทาง (ใช้ Layout WASD)
-createCamBtn("▲", UDim2.new(0.35, 0, 0, 0), function() mobileInput = Vector3.new(mobileInput.X, mobileInput.Y, -1) end, function() mobileInput = Vector3.new(mobileInput.X, mobileInput.Y, 0) end) -- Forward
-createCamBtn("▼", UDim2.new(0.35, 0, 0.7, 0), function() mobileInput = Vector3.new(mobileInput.X, mobileInput.Y, 1) end, function() mobileInput = Vector3.new(mobileInput.X, mobileInput.Y, 0) end) -- Backward
-createCamBtn("◄", UDim2.new(0, 0, 0.35, 0), function() mobileInput = Vector3.new(-1, mobileInput.Y, mobileInput.Z) end, function() mobileInput = Vector3.new(0, mobileInput.Y, mobileInput.Z) end) -- Left
-createCamBtn("►", UDim2.new(0.7, 0, 0.35, 0), function() mobileInput = Vector3.new(1, mobileInput.Y, mobileInput.Z) end, function() mobileInput = Vector3.new(0, mobileInput.Y, mobileInput.Z) end) -- Right
+createCamBtn("▲", UDim2.new(0.35, 0, 0, 0), function() mobileInput = Vector3.new(mobileInput.X, mobileInput.Y, -1) end, function() mobileInput = Vector3.new(mobileInput.X, mobileInput.Y, 0) end)
+createCamBtn("▼", UDim2.new(0.35, 0, 0.7, 0), function() mobileInput = Vector3.new(mobileInput.X, mobileInput.Y, 1) end, function() mobileInput = Vector3.new(mobileInput.X, mobileInput.Y, 0) end)
+createCamBtn("◄", UDim2.new(0, 0, 0.35, 0), function() mobileInput = Vector3.new(-1, mobileInput.Y, mobileInput.Z) end, function() mobileInput = Vector3.new(0, mobileInput.Y, mobileInput.Z) end)
+createCamBtn("►", UDim2.new(0.7, 0, 0.35, 0), function() mobileInput = Vector3.new(1, mobileInput.Y, mobileInput.Z) end, function() mobileInput = Vector3.new(0, mobileInput.Y, mobileInput.Z) end)
 
--- ปุ่มขึ้นลง (Up/Down) แยกออกมาไว้ขวา (ปกติเกมมือถือปุ่ม Action อยู่ขวา)
 local upDownFrame = Instance.new("Frame")
 upDownFrame.Size = UDim2.new(0, 50, 0, 110)
 upDownFrame.Position = UDim2.new(1, -50, 0.5, 0)
@@ -316,7 +341,6 @@ end
 createUD("⬆", UDim2.new(0,0,0,0), 1)
 createUD("⬇", UDim2.new(0,0,0.5,0), -1)
 
--- Touch Camera Look Logic
 local touchSens = 0.6
 local camRotX, camRotY = 0, 0
 
@@ -352,11 +376,7 @@ local pingLabel = Instance.new("TextLabel", statsFrame); pingLabel.Size=UDim2.ne
 local playersCountLabel = Instance.new("TextLabel", statsFrame); playersCountLabel.Size=UDim2.new(1,-10,0,20); playersCountLabel.Position=UDim2.new(0,10,0,25); playersCountLabel.BackgroundTransparency=1; playersCountLabel.Text="Players: --"; playersCountLabel.TextColor3=THEME_AKB_BLUE; playersCountLabel.Font=Enum.Font.GothamMedium; playersCountLabel.TextSize=14; playersCountLabel.TextXAlignment=Enum.TextXAlignment.Left
 local nonFriendsLabel = Instance.new("TextLabel", statsFrame); nonFriendsLabel.Size=UDim2.new(1,-10,0,20); nonFriendsLabel.Position=UDim2.new(0,10,0,45); nonFriendsLabel.BackgroundTransparency=1; nonFriendsLabel.Text="Enemies: --"; nonFriendsLabel.TextColor3=COLOR_NON_FRIEND; nonFriendsLabel.Font=Enum.Font.GothamMedium; nonFriendsLabel.TextSize=14; nonFriendsLabel.TextXAlignment=Enum.TextXAlignment.Left
 
-local nameContainer = Instance.new("Frame", screenGui); nameContainer.Visible=false; nameContainer.Size=UDim2.new(0.8,0,0.6,0); nameContainer.Position=UDim2.new(0.1,0,0.2,0); nameContainer.BackgroundColor3=THEME_PURPLE; makeDraggable(nameContainer)
-Instance.new("UICorner", nameContainer).CornerRadius=UDim.new(0,20)
-local myAvatarBig = Instance.new("ImageLabel", nameContainer); myAvatarBig.Size=UDim2.new(0.4,0,0.8,0); myAvatarBig.Position=UDim2.new(0.05,0,0.1,0); myAvatarBig.BackgroundTransparency=1; myAvatarBig.ScaleType=Enum.ScaleType.Fit
-task.spawn(function() myAvatarBig.Image = Players:GetUserThumbnailAsync(localPlayer.UserId, Enum.ThumbnailType.AvatarThumbnail, Enum.ThumbnailSize.Size420x420) end)
-local myNameLabel = Instance.new("TextLabel", nameContainer); myNameLabel.Text=localPlayer.DisplayName; myNameLabel.Size=UDim2.new(0.45,0,0.2,0); myNameLabel.Position=UDim2.new(0.5,0,0.3,0); myNameLabel.BackgroundTransparency=1; myNameLabel.TextColor3=THEME_MAIN; myNameLabel.TextScaled=true
+-- [REMOVED] nameContainer (จารึกชื่อ) ออก
 
 local serverHopFrame = Instance.new("Frame", screenGui); serverHopFrame.Visible=false; serverHopFrame.Size=UDim2.new(0,300,0,300); serverHopFrame.Position=UDim2.new(0.5,-150,0.5,-150); serverHopFrame.BackgroundColor3=THEME_DARK_BG; makeDraggable(serverHopFrame)
 Instance.new("UICorner", serverHopFrame).CornerRadius=UDim.new(0,15)
@@ -383,6 +403,7 @@ toggleFreeCam = function()
     if isFreeCamEnabled then
         if spectatingPlayer then
             spectatingPlayer = nil
+            spectateLabel.Text = "" -- Clear text
             camera.CameraSubject = localPlayer.Character and localPlayer.Character:FindFirstChild("Humanoid") or nil
         end
         
@@ -417,6 +438,7 @@ resetButton.MouseButton1Click:Connect(function()
     if localPlayer.Character then 
         camera.CameraSubject = localPlayer.Character:FindFirstChild("Humanoid")
         spectatingPlayer = nil
+        spectateLabel.Text = "" -- Clear text
         resetButton.Visible = false
         camera.CameraType = Enum.CameraType.Custom
         
@@ -429,7 +451,6 @@ resetButton.MouseButton1Click:Connect(function()
     end 
 end)
 
-nameButton.MouseButton1Click:Connect(function() isNameVisible=not isNameVisible; nameContainer.Visible=isNameVisible end)
 listButton.MouseButton1Click:Connect(function() isPlayerListVisible=not isPlayerListVisible; listFrame.Visible=isPlayerListVisible; searchBox.Visible=isPlayerListVisible; if isPlayerListVisible then updatePlayerList() end end)
 hopButton.MouseButton1Click:Connect(function() serverHopFrame.Visible=not serverHopFrame.Visible end)
 
@@ -448,16 +469,16 @@ updatePlayerList = function()
         if txt=="" or string.find(string.lower(p.Name), txt) then
             -- Main Entry Button (Spectate)
             local b = Instance.new("TextButton", listFrame)
-            b.Size = UDim2.new(1, -4, 0, 45) -- เพิ่มความสูงนิดหน่อยให้ใส่ปุ่มอื่นได้
+            b.Size = UDim2.new(1, -4, 0, 45)
             b.BackgroundColor3 = THEME_PURPLE
             b.BackgroundTransparency = 0.5
-            b.Text = "" -- ลบข้อความหลักออก จะใช้ Label แทน
+            b.Text = "" 
             b.AutoButtonColor = false
             Instance.new("UICorner", b).CornerRadius = UDim.new(0, 6)
 
             -- Name Label
             local nm = Instance.new("TextLabel", b)
-            nm.Size = UDim2.new(1, -50, 1, 0) -- เว้นที่ขวาไว้ให้ปุ่ม Block
+            nm.Size = UDim2.new(1, -50, 1, 0)
             nm.Position = UDim2.new(0, 10, 0, 0)
             nm.BackgroundTransparency = 1
             nm.Text = p.DisplayName
@@ -483,7 +504,7 @@ updatePlayerList = function()
                 end 
             end)
 
-            -- [RESTORED] Block Button
+            -- Block Button
             if p ~= localPlayer then
                 local blk = Instance.new("TextButton", b)
                 blk.Size = UDim2.new(0, 35, 0, 35)
@@ -520,36 +541,35 @@ end)
 
 RunService.RenderStepped:Connect(function(dt)
     if spectatingPlayer then
+        spectateLabel.Text = "กำลังส่อง: " .. spectatingPlayer.DisplayName -- [NEW] แสดงชื่อคนที่เราส่อง
         if spectatingPlayer.Character and spectatingPlayer.Character:FindFirstChild("Humanoid") then
              if camera.CameraSubject ~= spectatingPlayer.Character.Humanoid then
                  camera.CameraSubject = spectatingPlayer.Character.Humanoid
              end
         else
             spectatingPlayer = nil
+            spectateLabel.Text = ""
             if localPlayer.Character then
                 camera.CameraSubject = localPlayer.Character:FindFirstChild("Humanoid")
             end
         end
+    else
+        spectateLabel.Text = ""
     end
 
     if isFreeCamEnabled then
         local moveVec = Vector3.new()
-        
-        -- PC Input
         if UserInputService:IsKeyDown(Enum.KeyCode.W) then moveVec = moveVec + Vector3.new(0,0,-1) end
         if UserInputService:IsKeyDown(Enum.KeyCode.S) then moveVec = moveVec + Vector3.new(0,0,1) end
         if UserInputService:IsKeyDown(Enum.KeyCode.A) then moveVec = moveVec + Vector3.new(-1,0,0) end
         if UserInputService:IsKeyDown(Enum.KeyCode.D) then moveVec = moveVec + Vector3.new(1,0,0) end
         if UserInputService:IsKeyDown(Enum.KeyCode.Q) then moveVec = moveVec + Vector3.new(0,-1,0) end
         if UserInputService:IsKeyDown(Enum.KeyCode.E) then moveVec = moveVec + Vector3.new(0,1,0) end
-        
-        -- Mobile Input
         moveVec = moveVec + mobileInput
         
         local currentSpeed = 60
         if UserInputService:IsKeyDown(Enum.KeyCode.LeftShift) then currentSpeed = 150 end
         
-        -- Camera Rotation
         local rotCFrame
         if isMobile then
              camRotX = math.clamp(camRotX, math.rad(-89), math.rad(89))
@@ -557,7 +577,6 @@ RunService.RenderStepped:Connect(function(dt)
         else
              rotCFrame = camera.CFrame.Rotation
         end
-
         local newPos = camera.CFrame.Position + (rotCFrame * moveVec * currentSpeed * dt)
         camera.CFrame = CFrame.new(newPos) * rotCFrame
     end
@@ -569,9 +588,11 @@ RunService.RenderStepped:Connect(function(dt)
                 local bb = nameplates[p]
                 if not bb or bb.Adornee ~= head then
                     if bb then bb:Destroy() end
-                    bb = Instance.new("BillboardGui", espFolder); bb.Size=UDim2.new(0,120,0,60); bb.StudsOffset=Vector3.new(0,3.5,0); bb.AlwaysOnTop=true; bb.Adornee=head; bb.Name="ESP"
+                    -- [EDIT] ลดขนาดลงเล็กๆ เหมือนเดิม (100, 30)
+                    bb = Instance.new("BillboardGui", espFolder); bb.Size=UDim2.new(0,100,0,30); bb.StudsOffset=Vector3.new(0,3,0); bb.AlwaysOnTop=true; bb.Adornee=head; bb.Name="ESP"
+                    bb.Active = true -- [FIX] เปิด Active เพื่อให้กดได้
                     
-                    -- [RESTORED] Click to Spectate on ESP
+                    -- [FIX] Click to Spectate on ESP
                     local clickBtn = Instance.new("TextButton", bb)
                     clickBtn.Size = UDim2.new(1,0,1,0)
                     clickBtn.BackgroundTransparency = 1
@@ -592,7 +613,7 @@ RunService.RenderStepped:Connect(function(dt)
                         end
                     end)
 
-                    local t = Instance.new("TextLabel", bb); t.Size=UDim2.new(1,0,0.6,0); t.BackgroundTransparency=1; t.Text=p.DisplayName; t.TextColor3=THEME_MAIN; t.TextStrokeTransparency=0.5; t.Font=Enum.Font.GothamBold; t.TextScaled=true
+                    local t = Instance.new("TextLabel", bb); t.Size=UDim2.new(1,0,1,0); t.BackgroundTransparency=1; t.Text=p.DisplayName; t.TextColor3=THEME_MAIN; t.TextStrokeTransparency=0.5; t.Font=Enum.Font.GothamBold; t.TextScaled=true
                     nameplates[p] = bb
                 end
                 
