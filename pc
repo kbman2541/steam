@@ -1,6 +1,6 @@
 getgenv().AKB_Connections = getgenv().AKB_Connections or {}
 for _, connection in pairs(getgenv().AKB_Connections) do
-    if connection then connection:Disconnect() end
+	if connection then connection:Disconnect() end
 end
 table.clear(getgenv().AKB_Connections)
 
@@ -14,31 +14,31 @@ local StarterGui = game:GetService("StarterGui")
 local Lighting = game:GetService("Lighting")
 
 if not game:IsLoaded() then
-    game.Loaded:Wait()
+	game.Loaded:Wait()
 end
 
 local localPlayer = Players.LocalPlayer
 local camera = workspace.CurrentCamera
 
 -- ==========================================================
--- [NEW] ระบบลดแล็ค (FPS Boost / Remove Shadows)
+-- ระบบลดแล็ค (FPS Boost / Remove Shadows)
 -- ==========================================================
 local function optimizePerformance()
-    pcall(function()
-        Lighting.GlobalShadows = false
-        Lighting.FogEnd = 9e9
-        Lighting.ShadowSoftness = 0
-        
-        for _, v in pairs(Lighting:GetChildren()) do
-            if v:IsA("PostEffect") or v:IsA("BlurEffect") or v:IsA("SunRaysEffect") or v:IsA("ColorCorrectionEffect") or v:IsA("BloomEffect") or v:IsA("DepthOfFieldEffect") then
-                v:Destroy()
-            end
-        end
-        
-        if sethiddenproperty then
-            sethiddenproperty(Lighting, "Technology", Enum.Technology.Voxel)
-        end
-    end)
+	pcall(function()
+		Lighting.GlobalShadows = false
+		Lighting.FogEnd = 9e9
+		Lighting.ShadowSoftness = 0
+
+		for _, v in pairs(Lighting:GetChildren()) do
+			if v:IsA("PostEffect") or v:IsA("BlurEffect") or v:IsA("SunRaysEffect") or v:IsA("ColorCorrectionEffect") or v:IsA("BloomEffect") or v:IsA("DepthOfFieldEffect") then
+				v:Destroy()
+			end
+		end
+
+		if sethiddenproperty then
+			sethiddenproperty(Lighting, "Technology", Enum.Technology.Voxel)
+		end
+	end)
 end
 optimizePerformance()
 
@@ -50,127 +50,125 @@ local startSpectating
 local resetCameraToLocal
 local switchToNearestPlayer
 
--- [Self-Check] แจ้งเตือนเริ่มทำงาน
+-- แจ้งเตือนเริ่มทำงาน
 pcall(function()
-    StarterGui:SetCore("SendNotification", {
-        Title = "AKB System";
-        Text = "อัปเดต: V2.9 เพิ่มระบบซ่อน ESP คนที่อยู่ไกล (ลดแลค)";
-        Duration = 3;
-    })
+	StarterGui:SetCore("SendNotification", {
+		Title = "AKB System";
+		Text = "โหลดสคริปต์สำเร็จ! (อัปเดตระบบซูมกล้อง)";
+		Duration = 3;
+	})
 end)
 
--- [เรียกใช้ PlayerModule]
+-- เรียกใช้ PlayerModule
 local Controls
 local successModule, errModule = pcall(function()
-    local PlayerModule = require(localPlayer:WaitForChild("PlayerScripts"):WaitForChild("PlayerModule"))
-    Controls = PlayerModule:GetControls()
+	local PlayerModule = require(localPlayer:WaitForChild("PlayerScripts"):WaitForChild("PlayerModule"))
+	Controls = PlayerModule:GetControls()
 end)
 
 if not successModule then
-    warn("Warning: Could not load PlayerModule. Controls might act weird.")
+	warn("Warning: Could not load PlayerModule. Controls might act weird.")
 end
 
-localPlayer.CameraMaxZoomDistance = 100000 
+localPlayer.CameraMaxZoomDistance = 100000
 
 local isEspEnabled = false
 local isNameVisible = false
 local isPlayerListVisible = false
-local isFreeCamEnabled = false 
-local spectatingPlayer = nil 
-local lastSpectatedPosition = nil 
+local isFreeCamEnabled = false
+local spectatingPlayer = nil
+local lastSpectatedPosition = nil
 
 local isDamageCamEnabled = false
 local damageCamLockUntil = 0
 local previousHealths = {}
 
--- [FIX] ปิดการล็อคการหมุนกล้องเป็นค่าเริ่มต้น เพื่อให้ใช้กล้องของ Roblox ที่ลื่นไหลกว่า
 local isCamLockRotation = false
+local spectateZoomDistance = 15 -- ระยะซูมเริ่มต้นตอนส่องผู้เล่น
 
--- [NEW] จำกัดระยะการมองเห็น ESP (แก้แลคตอนคนเยอะ)
-local maxEspDistance = 3000 -- ระยะ Studs ที่ไกลที่สุดที่จะแสดงผล ESP
+local maxEspDistance = 3000
 
-local friendStatus = {} 
-local blockedStatus = {} 
+local friendStatus = {}
+local blockedStatus = {}
 
-local THEME_MAIN = Color3.fromRGB(0, 190, 255) 
+local THEME_MAIN = Color3.fromRGB(0, 190, 255)
 local COLOR_ENEMY = Color3.fromRGB(255, 40, 40)
-local THEME_PURPLE = Color3.fromRGB(30, 30, 45) 
+local THEME_PURPLE = Color3.fromRGB(30, 30, 45)
 local THEME_DARK_BG = Color3.fromRGB(20, 25, 35)
-local THEME_GLOW = Color3.fromRGB(180, 230, 255) 
+local THEME_GLOW = Color3.fromRGB(180, 230, 255)
 local THEME_WHITE = Color3.fromRGB(240, 240, 240)
-local THEME_SELECTED = Color3.fromRGB(255, 150, 50) 
-local THEME_AKB_BLUE = Color3.fromRGB(0, 240, 255) 
-local THEME_BLACK = Color3.fromRGB(0, 0, 0) 
-local THEME_FREECAM = Color3.fromRGB(170, 0, 255) 
+local THEME_SELECTED = Color3.fromRGB(255, 150, 50)
+local THEME_AKB_BLUE = Color3.fromRGB(0, 240, 255)
+local THEME_BLACK = Color3.fromRGB(0, 0, 0)
+local THEME_FREECAM = Color3.fromRGB(170, 0, 255)
 local THEME_HOP = Color3.fromRGB(0, 255, 128)
-local COLOR_BLOCKED_USER = Color3.fromRGB(70, 70, 70) 
+local COLOR_BLOCKED_USER = Color3.fromRGB(70, 70, 70)
 local COLOR_NON_FRIEND = Color3.fromRGB(255, 40, 40)
 local THEME_DAMAGE_CAM = Color3.fromRGB(255, 50, 50)
 
-local HEALTH_COLOR_FULL = Color3.fromRGB(85, 255, 127) 
-local HEALTH_COLOR_LOW = Color3.fromRGB(255, 85, 85)     
+local HEALTH_COLOR_FULL = Color3.fromRGB(85, 255, 127)
+local HEALTH_COLOR_LOW = Color3.fromRGB(255, 85, 85)
 
--- Helper เพื่อเช็คสถานะเพื่อน/บล็อก
+-- Helper เช็คสถานะเพื่อน/บล็อก
 local function checkFriendStatus(player)
-    if player == localPlayer then return end
-    task.spawn(function()
-        local isBlocked = false
-        local s2, blockedList = pcall(function() return StarterGui:GetCore("GetBlockedUserIds") end)
-        if s2 and blockedList then
-            for _, id in ipairs(blockedList) do
-                if id == player.UserId then isBlocked = true; break end
-            end
-        end
-        blockedStatus[player.UserId] = isBlocked
-        
-        if isBlocked then
-            friendStatus[player.UserId] = false
-        else
-            local success, isFriend = pcall(function()
-                return localPlayer:IsFriendsWith(player.UserId)
-            end)
-            if success then
-                friendStatus[player.UserId] = isFriend
-            else
-                friendStatus[player.UserId] = false
-            end
-        end
-    end)
+	if player == localPlayer then return end
+	task.spawn(function()
+		local isBlocked = false
+		local s2, blockedList = pcall(function() return StarterGui:GetCore("GetBlockedUserIds") end)
+		if s2 and blockedList then
+			for _, id in ipairs(blockedList) do
+				if id == player.UserId then isBlocked = true; break end
+			end
+		end
+		blockedStatus[player.UserId] = isBlocked
+
+		if isBlocked then
+			friendStatus[player.UserId] = false
+		else
+			local success, isFriend = pcall(function()
+				return localPlayer:IsFriendsWith(player.UserId)
+			end)
+			if success then
+				friendStatus[player.UserId] = isFriend
+			else
+				friendStatus[player.UserId] = false
+			end
+		end
+	end)
 end
 
--- Loop เช็คสถานะเพื่อน
 task.spawn(function()
-    while task.wait(3) do
-        if not getgenv().AKB_Connections then break end 
-        
-        local blockedList = {}
-        local sBlock, bResult = pcall(function() return StarterGui:GetCore("GetBlockedUserIds") end)
-        if sBlock then blockedList = bResult end
-        
-        for _, player in ipairs(Players:GetPlayers()) do
-            if player ~= localPlayer then
-                local pid = player.UserId
-                local isBlocked = false
-                for _, id in ipairs(blockedList) do
-                    if id == pid then isBlocked = true; break end
-                end
-                blockedStatus[pid] = isBlocked
-                
-                if isBlocked then
-                    friendStatus[pid] = false
-                else
-                    local sFriend, isFriend = pcall(function() return localPlayer:IsFriendsWith(pid) end)
-                    if sFriend then
-                        friendStatus[pid] = isFriend
-                    end
-                end
-            end
-        end
-    end
+	while task.wait(3) do
+		if not getgenv().AKB_Connections then break end
+
+		local blockedList = {}
+		local sBlock, bResult = pcall(function() return StarterGui:GetCore("GetBlockedUserIds") end)
+		if sBlock then blockedList = bResult end
+
+		for _, player in ipairs(Players:GetPlayers()) do
+			if player ~= localPlayer then
+				local pid = player.UserId
+				local isBlocked = false
+				for _, id in ipairs(blockedList) do
+					if id == pid then isBlocked = true; break end
+				end
+				blockedStatus[pid] = isBlocked
+
+				if isBlocked then
+					friendStatus[pid] = false
+				else
+					local sFriend, isFriend = pcall(function() return localPlayer:IsFriendsWith(pid) end)
+					if sFriend then
+						friendStatus[pid] = isFriend
+					end
+				end
+			end
+		end
+	end
 end)
 
 for _, player in ipairs(Players:GetPlayers()) do
-    checkFriendStatus(player)
+	checkFriendStatus(player)
 end
 
 -- ล้าง UI เก่า
@@ -182,51 +180,49 @@ screenGui.Name = "FantasyESP_Gui"
 screenGui.ResetOnSpawn = false
 screenGui.IgnoreGuiInset = true
 screenGui.Parent = localPlayer:WaitForChild("PlayerGui")
-screenGui.DisplayOrder = 10 
+screenGui.DisplayOrder = 10
 
 local espFolder = Instance.new("Folder")
 espFolder.Name = "ESP_Container"
 espFolder.Parent = screenGui
 
--- Container สำหรับเก็บ UI ทั้งหมด
 local uiContainer = Instance.new("Frame")
 uiContainer.Name = "Main_UI_Container"
 uiContainer.Size = UDim2.new(1, 0, 1, 0)
-uiContainer.Position = UDim2.new(0, 0, 0, 0) 
+uiContainer.Position = UDim2.new(0, 0, 0, 0)
 uiContainer.BackgroundTransparency = 1
 uiContainer.Visible = true
 uiContainer.Parent = screenGui
 
--- ปุ่ม Toggle UI
 local toggleUiBtn = Instance.new("ImageButton")
 toggleUiBtn.Name = "ToggleUI_Master"
 toggleUiBtn.Size = UDim2.new(0, 50, 0, 50)
-toggleUiBtn.Position = UDim2.new(0.5, -25, 0, 10) 
+toggleUiBtn.Position = UDim2.new(0.5, -25, 0, 10)
 toggleUiBtn.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
 toggleUiBtn.BackgroundTransparency = 0.3
-toggleUiBtn.Image = "rbxassetid://84859235971563" 
+toggleUiBtn.Image = "rbxassetid://84859235971563"
 toggleUiBtn.ScaleType = Enum.ScaleType.Fit
 toggleUiBtn.Parent = screenGui
 
 local tCorner = Instance.new("UICorner", toggleUiBtn)
-tCorner.CornerRadius = UDim.new(1, 0) 
+tCorner.CornerRadius = UDim.new(1, 0)
 local tStroke = Instance.new("UIStroke", toggleUiBtn)
 tStroke.Color = THEME_MAIN
 tStroke.Thickness = 2
 
 local isUiVisible = true
 toggleUiBtn.MouseButton1Click:Connect(function()
-    isUiVisible = not isUiVisible
-    
-    if isUiVisible then
-        tStroke.Color = THEME_MAIN
-        TweenService:Create(toggleUiBtn, TweenInfo.new(0.3), {ImageTransparency = 0}):Play()
-        TweenService:Create(uiContainer, TweenInfo.new(0.6, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {Position = UDim2.new(0, 0, 0, 0)}):Play()
-    else
-        tStroke.Color = Color3.fromRGB(100, 100, 100)
-        TweenService:Create(toggleUiBtn, TweenInfo.new(0.3), {ImageTransparency = 0.6}):Play()
-        TweenService:Create(uiContainer, TweenInfo.new(0.6, Enum.EasingStyle.Back, Enum.EasingDirection.In), {Position = UDim2.new(0, 0, 2, 0)}):Play()
-    end
+	isUiVisible = not isUiVisible
+
+	if isUiVisible then
+		tStroke.Color = THEME_MAIN
+		TweenService:Create(toggleUiBtn, TweenInfo.new(0.3), {ImageTransparency = 0}):Play()
+		TweenService:Create(uiContainer, TweenInfo.new(0.6, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {Position = UDim2.new(0, 0, 0, 0)}):Play()
+	else
+		tStroke.Color = Color3.fromRGB(100, 100, 100)
+		TweenService:Create(toggleUiBtn, TweenInfo.new(0.3), {ImageTransparency = 0.6}):Play()
+		TweenService:Create(uiContainer, TweenInfo.new(0.6, Enum.EasingStyle.Back, Enum.EasingDirection.In), {Position = UDim2.new(0, 0, 2, 0)}):Play()
+	end
 end)
 
 -- Stats Frame
@@ -234,8 +230,8 @@ local statsFrame = Instance.new("Frame")
 statsFrame.Name = "StatsDisplay"
 statsFrame.BackgroundColor3 = THEME_DARK_BG
 statsFrame.BackgroundTransparency = 0.3
-statsFrame.Size = UDim2.new(0, 180, 0, 120) -- ปรับความสูงเพิ่มขึ้นเพื่อรองรับเวลา
-statsFrame.Position = UDim2.new(1, -200, 0, 100) 
+statsFrame.Size = UDim2.new(0, 180, 0, 120)
+statsFrame.Position = UDim2.new(1, -200, 0, 100)
 statsFrame.Parent = uiContainer
 
 local statsCorner = Instance.new("UICorner", statsFrame)
@@ -282,57 +278,56 @@ nonFriendsLabel.TextSize = 16
 nonFriendsLabel.TextXAlignment = Enum.TextXAlignment.Left
 nonFriendsLabel.Parent = statsFrame
 
--- [NEW] Time Label ใต้จำนวนคนที่ไม่ใช่เพื่อน (Enemies) พร้อมวินาที
 local timeLabel = Instance.new("TextLabel")
 timeLabel.Name = "Time_Label"
 timeLabel.Size = UDim2.new(1, -20, 0, 30)
 timeLabel.Position = UDim2.new(0, 15, 0, 80)
 timeLabel.BackgroundTransparency = 1
 timeLabel.Text = "Time: 00.00.00"
-timeLabel.TextColor3 = Color3.fromRGB(255, 215, 0) -- สีทองสวยๆ
+timeLabel.TextColor3 = Color3.fromRGB(255, 215, 0)
 timeLabel.Font = Enum.Font.GothamMedium
 timeLabel.TextSize = 16
 timeLabel.TextXAlignment = Enum.TextXAlignment.Left
 timeLabel.Parent = statsFrame
 
 local function createFantasyButton(name, text, pos, color)
-    local btn = Instance.new("TextButton")
-    btn.Name = name
-    btn.Text = text
-    btn.TextColor3 = THEME_WHITE
-    btn.BackgroundColor3 = THEME_DARK_BG
-    btn.Size = UDim2.new(0, 160, 0, 45)
-    btn.Position = pos
-    btn.Font = Enum.Font.GothamBold
-    btn.TextSize = 14
-    btn.AutoButtonColor = false 
-    btn.Parent = uiContainer 
-    
-    local corner = Instance.new("UICorner", btn)
-    corner.CornerRadius = UDim.new(0, 8)
-    
-    local stroke = Instance.new("UIStroke", btn)
-    stroke.Color = color or THEME_MAIN
-    stroke.Thickness = 2
-    stroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
-    
-    local gradient = Instance.new("UIGradient", btn)
-    gradient.Color = ColorSequence.new({
-        ColorSequenceKeypoint.new(0, Color3.new(1,1,1)),
-        ColorSequenceKeypoint.new(1, Color3.new(0.7,0.7,0.7))
-    })
-    gradient.Rotation = 90
-    
-    btn.MouseEnter:Connect(function()
-        TweenService:Create(stroke, TweenInfo.new(0.2), {Thickness = 3, Color = THEME_GLOW}):Play()
-        TweenService:Create(btn, TweenInfo.new(0.2), {BackgroundColor3 = Color3.fromRGB(40, 50, 70)}):Play()
-    end)
-    btn.MouseLeave:Connect(function()
-        TweenService:Create(stroke, TweenInfo.new(0.2), {Thickness = 2, Color = color or THEME_MAIN}):Play()
-        TweenService:Create(btn, TweenInfo.new(0.2), {BackgroundColor3 = THEME_DARK_BG}):Play()
-    end)
-    
-    return btn
+	local btn = Instance.new("TextButton")
+	btn.Name = name
+	btn.Text = text
+	btn.TextColor3 = THEME_WHITE
+	btn.BackgroundColor3 = THEME_DARK_BG
+	btn.Size = UDim2.new(0, 160, 0, 45)
+	btn.Position = pos
+	btn.Font = Enum.Font.GothamBold
+	btn.TextSize = 14
+	btn.AutoButtonColor = false
+	btn.Parent = uiContainer
+
+	local corner = Instance.new("UICorner", btn)
+	corner.CornerRadius = UDim.new(0, 8)
+
+	local stroke = Instance.new("UIStroke", btn)
+	stroke.Color = color or THEME_MAIN
+	stroke.Thickness = 2
+	stroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+
+	local gradient = Instance.new("UIGradient", btn)
+	gradient.Color = ColorSequence.new({
+		ColorSequenceKeypoint.new(0, Color3.new(1,1,1)),
+		ColorSequenceKeypoint.new(1, Color3.new(0.7,0.7,0.7))
+	})
+	gradient.Rotation = 90
+
+	btn.MouseEnter:Connect(function()
+		TweenService:Create(stroke, TweenInfo.new(0.2), {Thickness = 3, Color = THEME_GLOW}):Play()
+		TweenService:Create(btn, TweenInfo.new(0.2), {BackgroundColor3 = Color3.fromRGB(40, 50, 70)}):Play()
+	end)
+	btn.MouseLeave:Connect(function()
+		TweenService:Create(stroke, TweenInfo.new(0.2), {Thickness = 2, Color = color or THEME_MAIN}):Play()
+		TweenService:Create(btn, TweenInfo.new(0.2), {BackgroundColor3 = THEME_DARK_BG}):Play()
+	end)
+
+	return btn
 end
 
 local nameContainer = Instance.new("Frame")
@@ -371,8 +366,8 @@ logoStroke.Transparency = 0
 
 local logoGradient = Instance.new("UIGradient", shopLogo)
 logoGradient.Color = ColorSequence.new({
-    ColorSequenceKeypoint.new(0, Color3.fromRGB(220, 255, 255)),
-    ColorSequenceKeypoint.new(1, Color3.fromRGB(0, 150, 200))
+	ColorSequenceKeypoint.new(0, Color3.fromRGB(220, 255, 255)),
+	ColorSequenceKeypoint.new(1, Color3.fromRGB(0, 150, 200))
 })
 logoGradient.Rotation = -45
 
@@ -395,8 +390,8 @@ myAvatarBig.BackgroundTransparency = 1
 myAvatarBig.Parent = nameContainer
 
 task.spawn(function()
-    local content = Players:GetUserThumbnailAsync(localPlayer.UserId, Enum.ThumbnailType.AvatarThumbnail, Enum.ThumbnailSize.Size420x420)
-    myAvatarBig.Image = content
+	local content = Players:GetUserThumbnailAsync(localPlayer.UserId, Enum.ThumbnailType.AvatarThumbnail, Enum.ThumbnailSize.Size420x420)
+	myAvatarBig.Image = content
 end)
 
 local myNameLabel = Instance.new("TextLabel")
@@ -422,8 +417,8 @@ myUserLabel.TextXAlignment = Enum.TextXAlignment.Left
 myUserLabel.TextTransparency = 0.3
 myUserLabel.Parent = nameContainer
 
-local damageCamButton = createFantasyButton("DamageCamButton", "🩸 Auto Cam: ปิด (V)", UDim2.new(0, 20, 1, -115), THEME_DAMAGE_CAM) 
-local freeCamButton = createFantasyButton("FreeCamButton", "📷 กล้องอิสระ: ปิด (Z)", UDim2.new(0, 20, 1, -60), THEME_FREECAM) 
+local damageCamButton = createFantasyButton("DamageCamButton", "🩸 Auto Cam: ปิด (V)", UDim2.new(0, 20, 1, -115), THEME_DAMAGE_CAM)
+local freeCamButton = createFantasyButton("FreeCamButton", "📷 กล้องอิสระ: ปิด (Z)", UDim2.new(0, 20, 1, -60), THEME_FREECAM)
 local nameButton = createFantasyButton("NameButton", "📜 จารึกชื่อ: ปิด", UDim2.new(0, 190, 1, -60), Color3.fromRGB(60, 160, 220))
 local espButton = createFantasyButton("EspButton", "⚔️ เนตรเวทย์: ปิด (X)", UDim2.new(0, 360, 1, -60), Color3.fromRGB(200, 60, 60))
 local hopButton = createFantasyButton("HopButton", "⚡ จัดการเซิร์ฟเวอร์", UDim2.new(0, 530, 1, -60), THEME_HOP)
@@ -431,10 +426,10 @@ local listButton = createFantasyButton("ListButton", "👥 คณะเดิน
 
 local serverHopFrame = Instance.new("Frame")
 serverHopFrame.Name = "ServerHop_UI"
-serverHopFrame.Size = UDim2.new(0, 350, 0, 300) 
+serverHopFrame.Size = UDim2.new(0, 350, 0, 300)
 serverHopFrame.Position = UDim2.new(0.5, -175, 0.5, -150)
 serverHopFrame.BackgroundColor3 = THEME_DARK_BG
-serverHopFrame.BackgroundTransparency = 0.3 
+serverHopFrame.BackgroundTransparency = 0.3
 serverHopFrame.Visible = false
 serverHopFrame.ZIndex = 200
 serverHopFrame.Parent = uiContainer
@@ -525,129 +520,142 @@ local rjCorner = Instance.new("UICorner", randomHopBtn)
 rjCorner.CornerRadius = UDim.new(0, 8)
 
 copyCurrentJobBtn.MouseButton1Click:Connect(function()
-    if setclipboard then
-        setclipboard(game.JobId)
-        copyCurrentJobBtn.Text = "✅ คัดลอกเรียบร้อย!"
-        task.wait(1)
-        copyCurrentJobBtn.Text = "📋 คัดลอก Job ID ห้องนี้"
-    else
-        copyCurrentJobBtn.Text = "❌ Executor ไม่รองรับ"
-    end
+	if setclipboard then
+		setclipboard(game.JobId)
+		copyCurrentJobBtn.Text = "✅ คัดลอกเรียบร้อย!"
+		task.wait(1)
+		copyCurrentJobBtn.Text = "📋 คัดลอก Job ID ห้องนี้"
+	else
+		copyCurrentJobBtn.Text = "❌ Executor ไม่รองรับ"
+	end
 end)
 
--- [UPDATED] ระบบย้ายเซิฟตาม ID พร้อมเช็คว่าเป็นเซิฟเดิมหรือไม่
 joinJobBtn.MouseButton1Click:Connect(function()
-    local targetId = string.gsub(jobIdInput.Text, "%s+", "") -- ลบช่องว่างออก
-    
-    if targetId and targetId ~= "" then
-        if targetId == game.JobId then
-            joinJobBtn.Text = "⚠️ คุณอยู่ในเซิฟเวอร์นี้แล้ว"
-            task.wait(2)
-            joinJobBtn.Text = "🚀 ย้ายไปห้องนี้ (Join ID)"
-            return
-        end
+	local targetId = string.gsub(jobIdInput.Text, "%s+", "") 
 
-        joinJobBtn.Text = "⏳ กำลังย้าย..."
-        pcall(function()
-            TeleportService:TeleportToPlaceInstance(game.PlaceId, targetId, localPlayer)
-        end)
-    else
-        joinJobBtn.Text = "⚠️ กรุณาใส่ Job ID"
-        task.wait(1)
-        joinJobBtn.Text = "🚀 ย้ายไปห้องนี้ (Join ID)"
-    end
+	if targetId and targetId ~= "" then
+		if targetId == game.JobId then
+			joinJobBtn.Text = "⚠️ คุณอยู่ในเซิฟเวอร์นี้แล้ว"
+			task.wait(2)
+			joinJobBtn.Text = "🚀 ย้ายไปห้องนี้ (Join ID)"
+			return
+		end
+
+		joinJobBtn.Text = "⏳ กำลังย้าย..."
+		pcall(function()
+			TeleportService:TeleportToPlaceInstance(game.PlaceId, targetId, localPlayer)
+		end)
+	else
+		joinJobBtn.Text = "⚠️ กรุณาใส่ Job ID"
+		task.wait(1)
+		joinJobBtn.Text = "🚀 ย้ายไปห้องนี้ (Join ID)"
+	end
 end)
 
 local function ServerHopLogic()
-    randomHopBtn.Text = "⏳ กำลังค้นหา..."
-    
-    local request = (syn and syn.request) or (http and http.request) or http_request or (fluxus and fluxus.request) or request
-    
-    if request then
-        task.spawn(function()
-            local placeId = game.PlaceId
-            local foundServer = nil
-            local cursor = ""
-            local searchedPages = 0
-            local maxPages = 20 
-            
-            local bestServer = nil
-            local minPlayersFound = 999
-            
-            while searchedPages < maxPages do
-                searchedPages = searchedPages + 1
-                local url = "https://games.roblox.com/v1/games/" .. placeId .. "/servers/Public?sortOrder=Desc&limit=100"
-                
-                if cursor and cursor ~= "" then
-                    url = url .. "&cursor=" .. cursor
-                end
-                
-                local success, response = pcall(function()
-                    return request({Url = url, Method = "GET"})
-                end)
-                
-                if success and response and response.Body then
-                    local body = HttpService:JSONDecode(response.Body)
-                    if body and body.data then
-                        local candidates = {}
-                        
-                        for _, v in ipairs(body.data) do
-                            if type(v) == "table" and v.maxPlayers and v.id ~= game.JobId then
-                                local playing = v.playing or 0
-                                
-                                if playing < minPlayersFound and playing > 0 then
-                                    minPlayersFound = playing
-                                    bestServer = v.id
-                                end
-                                
-                                if playing < 10 and playing > 0 then
-                                    table.insert(candidates, v.id)
-                                end
-                            end
-                        end
-                        
-                        if #candidates > 0 then
-                            randomHopBtn.Text = "เจอห้อง! (" .. #candidates .. ")"
-                            task.wait(0.5)
-                            foundServer = candidates[math.random(1, #candidates)]
-                            break
-                        end
+	randomHopBtn.Text = "⏳ กำลังค้นหา..."
 
-                        if body.nextPageCursor then
-                            cursor = body.nextPageCursor
-                            randomHopBtn.Text = "หาต่อ... (ต่ำสุด: " .. (minPlayersFound == 999 and "-" or minPlayersFound) .. ")"
-                            task.wait(0.2) 
-                        else
-                            break 
-                        end
-                    end
-                else
-                    warn("API Error or Rate limit")
-                    break
-                end
-            end
-            
-            if foundServer then
-                randomHopBtn.Text = "🚀 วาร์ป..."
-                TeleportService:TeleportToPlaceInstance(placeId, foundServer, localPlayer)
-            elseif bestServer then
-                randomHopBtn.Text = "⚠️ ไปห้อง " .. minPlayersFound .. " คนแทน"
-                task.wait(1)
-                TeleportService:TeleportToPlaceInstance(placeId, bestServer, localPlayer)
-            else
-                randomHopBtn.Text = "❌ ไม่พบห้องเลย"
-                task.wait(2)
-                randomHopBtn.Text = "🎲 สุ่มห้องคนน้อย (< 10)"
-            end
-        end)
-    else
-        randomHopBtn.Text = "❌ Executor ไม่รองรับ"
-    end
+	local request = (syn and syn.request) or (http and http.request) or http_request or (fluxus and fluxus.request) or request
+
+	if request then
+		task.spawn(function()
+			local placeId = game.PlaceId
+			local foundServer = nil
+			local cursor = ""
+			local searchedPages = 0
+			local maxPages = 20
+
+			local bestServer = nil
+			local minPlayersFound = 999
+			local bestPing = 999
+			local maxAcceptablePing = 150 -- ตั้งค่าปิงสูงสุดที่ยอมรับได้ (เปลี่ยนตัวเลขได้ตามต้องการ)
+
+			while searchedPages < maxPages do
+				searchedPages = searchedPages + 1
+				
+				-- เปลี่ยน sortOrder เป็น Asc เพื่อเรียงจากคนน้อยสุดไปหาคนมาก
+				local url = "https://games.roblox.com/v1/games/" .. placeId .. "/servers/Public?sortOrder=Asc&limit=100"
+
+				if cursor and cursor ~= "" then
+					url = url .. "&cursor=" .. cursor
+				end
+
+				local success, response = pcall(function()
+					return request({Url = url, Method = "GET"})
+				end)
+
+				if success and response and response.Body then
+					local body = HttpService:JSONDecode(response.Body)
+					if body and body.data then
+						local candidates = {}
+
+						for _, v in ipairs(body.data) do
+							if type(v) == "table" and v.maxPlayers and v.id ~= game.JobId then
+								local playing = v.playing or 0
+								local ping = v.ping or 999 -- ดึงค่าปิงจาก API ของ Roblox
+
+								-- หาเซิร์ฟเวอร์สำรองที่ดีที่สุด (คนน้อยสุด และ ปิงต้องไม่เกินที่กำหนด)
+								if playing > 0 and playing < minPlayersFound and ping <= maxAcceptablePing then
+									minPlayersFound = playing
+									bestPing = ping
+									bestServer = v.id
+								end
+
+								-- ถ้าห้องคนน้อยกว่า 10 และปิงไม่เกินที่กำหนด ให้เก็บเป็นตัวเลือก
+								if playing < 10 and playing > 0 and ping <= maxAcceptablePing then
+									table.insert(candidates, {id = v.id, ping = ping, players = playing})
+								end
+							end
+						end
+
+						-- ถ้าเจอเซิร์ฟเวอร์ที่ผ่านเงื่อนไข
+						if #candidates > 0 then
+							-- จัดเรียงลำดับใหม่ เอาห้องที่ "ปิงน้อยที่สุด" ขึ้นมาเป็นอันดับ 1
+							table.sort(candidates, function(a, b) 
+								return a.ping < b.ping 
+							end)
+
+							randomHopBtn.Text = "เจอห้อง! (" .. candidates[1].players .. " คน, ปิง " .. candidates[1].ping .. ")"
+							task.wait(0.5)
+							foundServer = candidates[1].id -- เลือกห้องที่ดีที่สุด
+							break
+						end
+
+						if body.nextPageCursor then
+							cursor = body.nextPageCursor
+							randomHopBtn.Text = "หาต่อ... (ปิงดีสุด: " .. (bestPing == 999 and "-" or bestPing) .. ")"
+							task.wait(0.2)
+						else
+							break
+						end
+					end
+				else
+					warn("API Error or Rate limit")
+					break
+				end
+			end
+
+			if foundServer then
+				randomHopBtn.Text = "🚀 วาร์ปไปห้องปิงต่ำ..."
+				TeleportService:TeleportToPlaceInstance(placeId, foundServer, localPlayer)
+			elseif bestServer then
+				randomHopBtn.Text = "⚠️ ไปห้อง " .. minPlayersFound .. " คน (ปิง " .. bestPing .. ") แทน"
+				task.wait(1)
+				TeleportService:TeleportToPlaceInstance(placeId, bestServer, localPlayer)
+			else
+				randomHopBtn.Text = "❌ ไม่พบห้องที่ปิงต่ำเลย"
+				task.wait(2)
+				randomHopBtn.Text = "🎲 สุ่มห้องคนน้อย (< 10)"
+			end
+		end)
+	else
+		randomHopBtn.Text = "❌ Executor ไม่รองรับ HTTP Request"
+	end
 end
 randomHopBtn.MouseButton1Click:Connect(ServerHopLogic)
 
 hopButton.MouseButton1Click:Connect(function()
-    serverHopFrame.Visible = not serverHopFrame.Visible
+	serverHopFrame.Visible = not serverHopFrame.Visible
 end)
 
 local nameplates = {}
@@ -655,13 +663,13 @@ local nameplates = {}
 local mutualFrame = Instance.new("Frame")
 mutualFrame.Name = "MutualFriends_Popup"
 mutualFrame.Size = UDim2.new(0, 400, 0, 550)
-mutualFrame.Position = UDim2.new(0, 20, 0.5, 0) 
+mutualFrame.Position = UDim2.new(0, 20, 0.5, 0)
 mutualFrame.AnchorPoint = Vector2.new(0, 0.5)
-mutualFrame.BackgroundColor3 = Color3.fromRGB(15, 15, 25) 
+mutualFrame.BackgroundColor3 = Color3.fromRGB(15, 15, 25)
 mutualFrame.BackgroundTransparency = 0.05
 mutualFrame.Visible = false
-mutualFrame.ZIndex = 100 
-mutualFrame.Parent = uiContainer 
+mutualFrame.ZIndex = 100
+mutualFrame.Parent = uiContainer
 
 local mfCorner = Instance.new("UICorner", mutualFrame)
 mfCorner.CornerRadius = UDim.new(0, 12)
@@ -691,7 +699,7 @@ mfClose.TextSize = 22
 mfClose.ZIndex = 101
 mfClose.Parent = mutualFrame
 mfClose.MouseButton1Click:Connect(function()
-    mutualFrame.Visible = false
+	mutualFrame.Visible = false
 end)
 
 local mfList = Instance.new("ScrollingFrame")
@@ -701,8 +709,8 @@ mfList.BackgroundTransparency = 1
 mfList.ScrollBarThickness = 4
 mfList.ScrollBarImageColor3 = THEME_MAIN
 mfList.ZIndex = 101
-mfList.AutomaticCanvasSize = Enum.AutomaticSize.Y 
-mfList.CanvasSize = UDim2.new(0, 0, 0, 0) 
+mfList.AutomaticCanvasSize = Enum.AutomaticSize.Y
+mfList.CanvasSize = UDim2.new(0, 0, 0, 0)
 mfList.Parent = mutualFrame
 
 local mfLayout = Instance.new("UIListLayout", mfList)
@@ -713,7 +721,7 @@ local currentMutualTargetId = nil
 
 local searchBox = Instance.new("TextBox")
 searchBox.Name = "SearchBox"
-searchBox.Size = UDim2.new(0, 230, 0, 40) 
+searchBox.Size = UDim2.new(0, 230, 0, 40)
 searchBox.Position = UDim2.new(1, -300, 0.5, -200)
 searchBox.BackgroundColor3 = THEME_DARK_BG
 searchBox.BackgroundTransparency = 0.1
@@ -724,7 +732,7 @@ searchBox.Text = ""
 searchBox.Font = Enum.Font.GothamMedium
 searchBox.TextSize = 18
 searchBox.Visible = isPlayerListVisible
-searchBox.Parent = uiContainer 
+searchBox.Parent = uiContainer
 
 local searchCorner = Instance.new("UICorner", searchBox)
 searchCorner.CornerRadius = UDim.new(0, 8)
@@ -737,17 +745,17 @@ searchStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
 local spectateStatusFrame = Instance.new("Frame")
 spectateStatusFrame.Name = "SpectateStatusFrame"
 spectateStatusFrame.Size = UDim2.new(0, 280, 0, 50)
-spectateStatusFrame.Position = UDim2.new(1, -300, 0.5, -260) 
+spectateStatusFrame.Position = UDim2.new(1, -300, 0.5, -260)
 spectateStatusFrame.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
 spectateStatusFrame.BackgroundTransparency = 0.4
 spectateStatusFrame.Visible = false
-spectateStatusFrame.Parent = uiContainer 
+spectateStatusFrame.Parent = uiContainer
 
 local ssCorner = Instance.new("UICorner", spectateStatusFrame)
 ssCorner.CornerRadius = UDim.new(0, 8)
 
 local ssStroke = Instance.new("UIStroke", spectateStatusFrame)
-ssStroke.Color = THEME_SELECTED 
+ssStroke.Color = THEME_SELECTED
 ssStroke.Thickness = 2
 ssStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
 
@@ -760,11 +768,11 @@ ssAvatar.BackgroundTransparency = 0.5
 ssAvatar.Parent = spectateStatusFrame
 
 local ssAvatarCorner = Instance.new("UICorner", ssAvatar)
-ssAvatarCorner.CornerRadius = UDim.new(1, 0) 
+ssAvatarCorner.CornerRadius = UDim.new(1, 0)
 
 local ssText = Instance.new("TextLabel")
 ssText.Name = "StatusText"
-ssText.Size = UDim2.new(1, -145, 1, 0) 
+ssText.Size = UDim2.new(1, -145, 1, 0)
 ssText.Position = UDim2.new(0, 55, 0, 0)
 ssText.BackgroundTransparency = 1
 ssText.TextColor3 = THEME_WHITE
@@ -795,7 +803,7 @@ ssCopyBtn.TextColor3 = THEME_WHITE
 ssCopyBtn.BackgroundColor3 = THEME_DARK_BG
 ssCopyBtn.BackgroundTransparency = 0.5
 ssCopyBtn.Size = UDim2.new(0, 30, 0, 30)
-ssCopyBtn.Position = UDim2.new(1, -65, 0.5, -15) 
+ssCopyBtn.Position = UDim2.new(1, -65, 0.5, -15)
 ssCopyBtn.Font = Enum.Font.GothamBold
 ssCopyBtn.Parent = spectateStatusFrame
 
@@ -806,13 +814,13 @@ ssCopyStroke.Color = THEME_MAIN
 ssCopyStroke.Thickness = 1
 
 ssCopyBtn.MouseButton1Click:Connect(function()
-    if spectatingPlayer and setclipboard then
-        setclipboard(spectatingPlayer.Name)
-        local old = ssCopyBtn.Text
-        ssCopyBtn.Text = "✓"
-        task.wait(1)
-        ssCopyBtn.Text = old
-    end
+	if spectatingPlayer and setclipboard then
+		setclipboard(spectatingPlayer.Name)
+		local old = ssCopyBtn.Text
+		ssCopyBtn.Text = "✓"
+		task.wait(1)
+		ssCopyBtn.Text = old
+	end
 end)
 
 local ssLockRotBtn = Instance.new("TextButton")
@@ -823,7 +831,7 @@ ssLockRotBtn.TextColor3 = THEME_WHITE
 ssLockRotBtn.BackgroundColor3 = THEME_DARK_BG
 ssLockRotBtn.BackgroundTransparency = 0.5
 ssLockRotBtn.Size = UDim2.new(0, 30, 0, 30)
-ssLockRotBtn.Position = UDim2.new(1, -100, 0.5, -15) 
+ssLockRotBtn.Position = UDim2.new(1, -100, 0.5, -15)
 ssLockRotBtn.Font = Enum.Font.GothamBold
 ssLockRotBtn.Parent = spectateStatusFrame
 
@@ -834,9 +842,9 @@ ssLockRotStroke.Color = THEME_WHITE
 ssLockRotStroke.Thickness = 1
 
 ssLockRotBtn.MouseButton1Click:Connect(function()
-    isCamLockRotation = not isCamLockRotation
-    ssLockRotBtn.TextColor3 = isCamLockRotation and Color3.fromRGB(85, 255, 127) or Color3.fromRGB(150, 150, 150)
-    ssLockRotStroke.Color = isCamLockRotation and Color3.fromRGB(85, 255, 127) or Color3.fromRGB(150, 150, 150)
+	isCamLockRotation = not isCamLockRotation
+	ssLockRotBtn.TextColor3 = isCamLockRotation and Color3.fromRGB(85, 255, 127) or Color3.fromRGB(150, 150, 150)
+	ssLockRotStroke.Color = isCamLockRotation and Color3.fromRGB(85, 255, 127) or Color3.fromRGB(150, 150, 150)
 end)
 
 local ssMutualBtn = Instance.new("TextButton")
@@ -847,7 +855,7 @@ ssMutualBtn.TextColor3 = THEME_AKB_BLUE
 ssMutualBtn.BackgroundColor3 = THEME_DARK_BG
 ssMutualBtn.BackgroundTransparency = 0.5
 ssMutualBtn.Size = UDim2.new(0, 30, 0, 30)
-ssMutualBtn.Position = UDim2.new(1, -135, 0.5, -15) 
+ssMutualBtn.Position = UDim2.new(1, -135, 0.5, -15)
 ssMutualBtn.Font = Enum.Font.GothamBold
 ssMutualBtn.Parent = spectateStatusFrame
 
@@ -858,13 +866,13 @@ ssMutualStroke.Color = THEME_AKB_BLUE
 ssMutualStroke.Thickness = 1
 
 ssMutualBtn.MouseButton1Click:Connect(function()
-    if spectatingPlayer then
-        if showMutualFriends then
-            showMutualFriends(spectatingPlayer)
-        else
-            warn("showMutualFriends function is not loaded yet!")
-        end
-    end
+	if spectatingPlayer then
+		if showMutualFriends then
+			showMutualFriends(spectatingPlayer)
+		else
+			warn("showMutualFriends function is not loaded yet!")
+		end
+	end
 end)
 
 local ssBlockBtn = Instance.new("TextButton")
@@ -875,7 +883,7 @@ ssBlockBtn.TextColor3 = Color3.fromRGB(150, 150, 150)
 ssBlockBtn.BackgroundColor3 = THEME_DARK_BG
 ssBlockBtn.BackgroundTransparency = 0.5
 ssBlockBtn.Size = UDim2.new(0, 30, 0, 30)
-ssBlockBtn.Position = UDim2.new(1, -170, 0.5, -15) 
+ssBlockBtn.Position = UDim2.new(1, -170, 0.5, -15)
 ssBlockBtn.Font = Enum.Font.GothamBold
 ssBlockBtn.Parent = spectateStatusFrame
 
@@ -886,52 +894,52 @@ ssBlockStroke.Color = Color3.fromRGB(150, 150, 150)
 ssBlockStroke.Thickness = 1
 
 ssBlockBtn.MouseButton1Click:Connect(function()
-    if spectatingPlayer then
-         pcall(function()
-            local blockedUsers = {}
-            pcall(function() blockedUsers = StarterGui:GetCore("GetBlockedUserIds") end)
-            local isBlockedInitial = false
-            for _, id in ipairs(blockedUsers) do
-                if id == spectatingPlayer.UserId then isBlockedInitial = true; break end
-            end
+	if spectatingPlayer then
+		pcall(function()
+			local blockedUsers = {}
+			pcall(function() blockedUsers = StarterGui:GetCore("GetBlockedUserIds") end)
+			local isBlockedInitial = false
+			for _, id in ipairs(blockedUsers) do
+				if id == spectatingPlayer.UserId then isBlockedInitial = true; break end
+			end
 
-            if isBlockedInitial then
-                 StarterGui:SetCore("PromptUnblockPlayer", spectatingPlayer)
-            else
-                 StarterGui:SetCore("PromptBlockPlayer", spectatingPlayer)
-            end
-            
-            task.spawn(function()
-                for i = 1, 10 do 
-                    task.wait(1)
-                    if not spectatingPlayer then break end
-                    
-                    local newBlockedUsers = {}
-                    pcall(function() newBlockedUsers = StarterGui:GetCore("GetBlockedUserIds") end)
-                    local isBlockedNow = false
-                    for _, id in ipairs(newBlockedUsers) do
-                        if id == spectatingPlayer.UserId then isBlockedNow = true; break end
-                    end
-                    
-                    if isBlockedNow ~= isBlockedInitial then
-                        blockedStatus[spectatingPlayer.UserId] = isBlockedNow
-                        if isBlockedNow == true then
-                            friendStatus[spectatingPlayer.UserId] = false 
-                        else
-                            friendStatus[spectatingPlayer.UserId] = false 
-                        end
+			if isBlockedInitial then
+				StarterGui:SetCore("PromptUnblockPlayer", spectatingPlayer)
+			else
+				StarterGui:SetCore("PromptBlockPlayer", spectatingPlayer)
+			end
 
-                        ssBlockBtn.Text = isBlockedNow and "🚫" or "🛡️"
-                        ssBlockBtn.TextColor3 = isBlockedNow and Color3.fromRGB(255, 100, 100) or Color3.fromRGB(150, 150, 150)
-                        ssBlockStroke.Color = isBlockedNow and Color3.fromRGB(255, 50, 50) or Color3.fromRGB(150, 150, 150)
-                        
-                        updatePlayerList() 
-                        break 
-                    end
-                end
-            end)
-        end)
-    end
+			task.spawn(function()
+				for i = 1, 10 do
+					task.wait(1)
+					if not spectatingPlayer then break end
+
+					local newBlockedUsers = {}
+					pcall(function() newBlockedUsers = StarterGui:GetCore("GetBlockedUserIds") end)
+					local isBlockedNow = false
+					for _, id in ipairs(newBlockedUsers) do
+						if id == spectatingPlayer.UserId then isBlockedNow = true; break end
+					end
+
+					if isBlockedNow ~= isBlockedInitial then
+						blockedStatus[spectatingPlayer.UserId] = isBlockedNow
+						if isBlockedNow == true then
+							friendStatus[spectatingPlayer.UserId] = false
+						else
+							friendStatus[spectatingPlayer.UserId] = false
+						end
+
+						ssBlockBtn.Text = isBlockedNow and "🚫" or "🛡️"
+						ssBlockBtn.TextColor3 = isBlockedNow and Color3.fromRGB(255, 100, 100) or Color3.fromRGB(150, 150, 150)
+						ssBlockStroke.Color = isBlockedNow and Color3.fromRGB(255, 50, 50) or Color3.fromRGB(150, 150, 150)
+
+						updatePlayerList()
+						break
+					end
+				end
+			end)
+		end)
+	end
 end)
 
 local resetButton = Instance.new("TextButton")
@@ -940,12 +948,12 @@ resetButton.Text = "👁️"
 resetButton.TextColor3 = THEME_WHITE
 resetButton.BackgroundColor3 = THEME_DARK_BG
 resetButton.Size = UDim2.new(0, 45, 0, 40)
-resetButton.Position = UDim2.new(1, -65, 0.5, -200) 
+resetButton.Position = UDim2.new(1, -65, 0.5, -200)
 resetButton.Font = Enum.Font.GothamBold
 resetButton.TextSize = 20
-resetButton.AutoButtonColor = false 
-resetButton.Visible = false 
-resetButton.Parent = uiContainer 
+resetButton.AutoButtonColor = false
+resetButton.Visible = false
+resetButton.Parent = uiContainer
 
 local resetCorner = Instance.new("UICorner", resetButton)
 resetCorner.CornerRadius = UDim.new(0, 8)
@@ -955,10 +963,10 @@ resetStroke.Color = THEME_WHITE
 resetStroke.Thickness = 2
 
 resetButton.MouseEnter:Connect(function()
-    TweenService:Create(resetStroke, TweenInfo.new(0.2), {Color = THEME_GLOW}):Play()
+	TweenService:Create(resetStroke, TweenInfo.new(0.2), {Color = THEME_GLOW}):Play()
 end)
 resetButton.MouseLeave:Connect(function()
-    TweenService:Create(resetStroke, TweenInfo.new(0.2), {Color = THEME_WHITE}):Play()
+	TweenService:Create(resetStroke, TweenInfo.new(0.2), {Color = THEME_WHITE}):Play()
 end)
 
 local listFrame = Instance.new("ScrollingFrame")
@@ -970,7 +978,7 @@ listFrame.BackgroundTransparency = 0.1
 listFrame.Visible = isPlayerListVisible
 listFrame.ScrollBarThickness = 6
 listFrame.ScrollBarImageColor3 = THEME_MAIN
-listFrame.Parent = uiContainer 
+listFrame.Parent = uiContainer
 
 local listStroke = Instance.new("UIStroke", listFrame)
 listStroke.Color = THEME_MAIN
@@ -989,642 +997,637 @@ listPadding.PaddingTop = UDim.new(0, 10)
 listPadding.PaddingBottom = UDim.new(0, 10)
 
 updateListSelection = function()
-    for _, child in pairs(listFrame:GetChildren()) do
-        if child:IsA("TextButton") then
-            local pId = child:GetAttribute("UserId")
-            local stroke = child:FindFirstChild("UIStroke")
-            
-            if spectatingPlayer and pId == spectatingPlayer.UserId then
-                TweenService:Create(child, TweenInfo.new(0.3), {BackgroundColor3 = Color3.fromRGB(80, 50, 20)}):Play()
-                if stroke then stroke.Color = THEME_SELECTED; stroke.Thickness = 2 end
-            else
-                TweenService:Create(child, TweenInfo.new(0.3), {BackgroundColor3 = THEME_PURPLE}):Play()
-                if stroke then stroke.Color = Color3.fromRGB(60, 70, 90); stroke.Thickness = 1 end
-            end
-        end
-    end
+	for _, child in pairs(listFrame:GetChildren()) do
+		if child:IsA("TextButton") then
+			local pId = child:GetAttribute("UserId")
+			local stroke = child:FindFirstChild("UIStroke")
 
-    if spectatingPlayer then
-        spectateStatusFrame.Visible = true
-        ssText.Text = "กำลังส่อง: " .. spectatingPlayer.DisplayName .. "\n<font size='12' color='#aaaaaa'>@" .. spectatingPlayer.Name .. "</font>"
-        
-        task.spawn(function()
-            local content = Players:GetUserThumbnailAsync(spectatingPlayer.UserId, Enum.ThumbnailType.HeadShot, Enum.ThumbnailSize.Size48x48)
-            ssAvatar.Image = content
-        end)
-        
-        ssBlockBtn.Position = UDim2.new(1, -170, 0.5, -15) 
-        ssText.Size = UDim2.new(1, -180, 1, 0) 
+			if spectatingPlayer and pId == spectatingPlayer.UserId then
+				TweenService:Create(child, TweenInfo.new(0.3), {BackgroundColor3 = Color3.fromRGB(80, 50, 20)}):Play()
+				if stroke then stroke.Color = THEME_SELECTED; stroke.Thickness = 2 end
+			else
+				TweenService:Create(child, TweenInfo.new(0.3), {BackgroundColor3 = THEME_PURPLE}):Play()
+				if stroke then stroke.Color = Color3.fromRGB(60, 70, 90); stroke.Thickness = 1 end
+			end
+		end
+	end
 
-        ssLockRotBtn.TextColor3 = isCamLockRotation and Color3.fromRGB(85, 255, 127) or Color3.fromRGB(150, 150, 150)
-        ssLockRotStroke.Color = isCamLockRotation and Color3.fromRGB(85, 255, 127) or Color3.fromRGB(150, 150, 150)
+	if spectatingPlayer then
+		spectateStatusFrame.Visible = true
+		ssText.Text = "กำลังส่อง: " .. spectatingPlayer.DisplayName .. "\n<font size='12' color='#aaaaaa'>@" .. spectatingPlayer.Name .. "</font>"
 
-        task.spawn(function()
-            local blockedUsers = {}
-            pcall(function() blockedUsers = StarterGui:GetCore("GetBlockedUserIds") end)
-            local isBlocked = false
-            for _, id in ipairs(blockedUsers) do
-                if id == spectatingPlayer.UserId then isBlocked = true; break end
-            end
-            
-            ssBlockBtn.Text = isBlocked and "🚫" or "🛡️"
-            ssBlockBtn.TextColor3 = isBlocked and Color3.fromRGB(255, 100, 100) or Color3.fromRGB(150, 150, 150)
-            ssBlockStroke.Color = isBlocked and Color3.fromRGB(255, 50, 50) or Color3.fromRGB(150, 150, 150)
-        end)
-        
-        resetButton.Visible = true
-    else
-        spectateStatusFrame.Visible = false
-        resetButton.Visible = false
-    end
+		task.spawn(function()
+			local content = Players:GetUserThumbnailAsync(spectatingPlayer.UserId, Enum.ThumbnailType.HeadShot, Enum.ThumbnailSize.Size48x48)
+			ssAvatar.Image = content
+		end)
+
+		ssBlockBtn.Position = UDim2.new(1, -170, 0.5, -15)
+		ssText.Size = UDim2.new(1, -180, 1, 0)
+
+		ssLockRotBtn.TextColor3 = isCamLockRotation and Color3.fromRGB(85, 255, 127) or Color3.fromRGB(150, 150, 150)
+		ssLockRotStroke.Color = isCamLockRotation and Color3.fromRGB(85, 255, 127) or Color3.fromRGB(150, 150, 150)
+
+		task.spawn(function()
+			local blockedUsers = {}
+			pcall(function() blockedUsers = StarterGui:GetCore("GetBlockedUserIds") end)
+			local isBlocked = false
+			for _, id in ipairs(blockedUsers) do
+				if id == spectatingPlayer.UserId then isBlocked = true; break end
+			end
+
+			ssBlockBtn.Text = isBlocked and "🚫" or "🛡️"
+			ssBlockBtn.TextColor3 = isBlocked and Color3.fromRGB(255, 100, 100) or Color3.fromRGB(150, 150, 150)
+			ssBlockStroke.Color = isBlocked and Color3.fromRGB(255, 50, 50) or Color3.fromRGB(150, 150, 150)
+		end)
+
+		resetButton.Visible = true
+	else
+		spectateStatusFrame.Visible = false
+		resetButton.Visible = false
+	end
 end
 
 startSpectating = function(player)
-    if player and player.Character and player.Character:FindFirstChild("Humanoid") then
-        UserInputService.MouseBehavior = Enum.MouseBehavior.Default
-        
-        isFreeCamEnabled = false
-        freeCamButton.Text = "📷 กล้องอิสระ: ปิด (Z)"
-        freeCamButton.UIStroke.Color = THEME_FREECAM
-        
-        if isCamLockRotation then
-            camera.CameraType = Enum.CameraType.Scriptable
-        else
-            camera.CameraType = Enum.CameraType.Custom
-            camera.CameraSubject = player.Character.Humanoid
-        end
-        
-        if Controls then Controls:Disable() end
-        
-        spectatingPlayer = player
-        resetButton.Visible = true
-        updateListSelection()
-        
-        -- [NEW] เก็บตำแหน่งล่าสุดเมื่อเริ่มส่อง (เผื่อคนที่เราส่อง Reset ทันที)
-        if player.Character:FindFirstChild("HumanoidRootPart") then
-            lastSpectatedPosition = player.Character.HumanoidRootPart.Position
-        end
-    end
+	if player and player.Character and player.Character:FindFirstChild("Humanoid") then
+		UserInputService.MouseBehavior = Enum.MouseBehavior.Default
+
+		isFreeCamEnabled = false
+		freeCamButton.Text = "📷 กล้องอิสระ: ปิด (Z)"
+		freeCamButton.UIStroke.Color = THEME_FREECAM
+
+		if isCamLockRotation then
+			camera.CameraType = Enum.CameraType.Scriptable
+		else
+			camera.CameraType = Enum.CameraType.Custom
+			camera.CameraSubject = player.Character.Humanoid
+		end
+
+		if Controls then Controls:Disable() end
+
+		spectatingPlayer = player
+		resetButton.Visible = true
+		updateListSelection()
+
+		if player.Character:FindFirstChild("HumanoidRootPart") then
+			lastSpectatedPosition = player.Character.HumanoidRootPart.Position
+		end
+	end
 end
 
 showMutualFriends = function(targetPlayer)
-    if not targetPlayer then return end
-    local targetUserId = targetPlayer.UserId
+	if not targetPlayer then return end
+	local targetUserId = targetPlayer.UserId
 
-    if mutualFrame.Visible and currentMutualTargetId == targetUserId then
-        mutualFrame.Visible = false
-        currentMutualTargetId = nil
-        return
-    end
+	if mutualFrame.Visible and currentMutualTargetId == targetUserId then
+		mutualFrame.Visible = false
+		currentMutualTargetId = nil
+		return
+	end
 
-    currentMutualTargetId = targetUserId
-    mutualFrame.Visible = true
+	currentMutualTargetId = targetUserId
+	mutualFrame.Visible = true
 
-    for _, child in pairs(mfList:GetChildren()) do
-        if child:IsA("Frame") or child:IsA("TextLabel") or child:IsA("TextButton") then child:Destroy() end
-    end
-    
-    local loading = Instance.new("TextLabel")
-    loading.Text = "กำลังสแกนรายชื่อเพื่อนทั้งหมด..."
-    loading.Size = UDim2.new(1, 0, 0, 50)
-    loading.BackgroundTransparency = 1
-    loading.TextColor3 = Color3.fromRGB(255, 255, 100)
-    loading.Font = Enum.Font.Gotham
-    loading.TextSize = 16
-    loading.ZIndex = 102
-    loading.Parent = mfList
-    
-    task.spawn(function()
-        local myFriendsMap = {}
-        local s1, myPages = pcall(function() return Players:GetFriendsAsync(localPlayer.UserId) end)
-        if s1 then
-            local limit = 0
-            while true do
-                for _, item in ipairs(myPages:GetCurrentPage()) do
-                    myFriendsMap[item.Id] = true
-                end
-                if myPages.IsFinished or limit > 10 then break end
-                myPages:AdvanceToNextPageAsync()
-                limit = limit + 1
-            end
-        end
+	for _, child in pairs(mfList:GetChildren()) do
+		if child:IsA("Frame") or child:IsA("TextLabel") or child:IsA("TextButton") then child:Destroy() end
+	end
 
-        local mutuals = {}
-        local othersInServer = {}
+	local loading = Instance.new("TextLabel")
+	loading.Text = "กำลังสแกนรายชื่อเพื่อนทั้งหมด..."
+	loading.Size = UDim2.new(1, 0, 0, 50)
+	loading.BackgroundTransparency = 1
+	loading.TextColor3 = Color3.fromRGB(255, 255, 100)
+	loading.Font = Enum.Font.Gotham
+	loading.TextSize = 16
+	loading.ZIndex = 102
+	loading.Parent = mfList
 
-        local targetFriendsAll = {}
-        local s2, targetPages = pcall(function() return Players:GetFriendsAsync(targetUserId) end)
-        
-        if s2 then
-             local limit = 0
-             while true do
-                for _, item in ipairs(targetPages:GetCurrentPage()) do
-                    table.insert(targetFriendsAll, item)
-                end
-                if targetPages.IsFinished or limit > 10 then break end
-                targetPages:AdvanceToNextPageAsync()
-                limit = limit + 1
-            end
-        else
-             loading.Text = "ไม่สามารถเข้าถึงรายชื่อเพื่อนได้ (Private)"
-             loading.TextColor3 = Color3.fromRGB(255, 80, 80)
-             return
-        end
+	task.spawn(function()
+		local myFriendsMap = {}
+		local s1, myPages = pcall(function() return Players:GetFriendsAsync(localPlayer.UserId) end)
+		if s1 then
+			local limit = 0
+			while true do
+				for _, item in ipairs(myPages:GetCurrentPage()) do
+					myFriendsMap[item.Id] = true
+				end
+				if myPages.IsFinished or limit > 10 then break end
+				myPages:AdvanceToNextPageAsync()
+				limit = limit + 1
+			end
+		end
 
-        for _, f in ipairs(targetFriendsAll) do
-            local isMutual = myFriendsMap[f.Id]
-            local playerInServer = Players:GetPlayerByUserId(f.Id)
+		local mutuals = {}
+		local othersInServer = {}
 
-            if isMutual then
-                table.insert(mutuals, {
-                    Id = f.Id,
-                    Username = f.Username,
-                    DisplayName = f.DisplayName,
-                    IsOnline = f.IsOnline,
-                    Instance = playerInServer 
-                })
-            elseif playerInServer then
-                table.insert(othersInServer, playerInServer)
-            end
-        end
+		local targetFriendsAll = {}
+		local s2, targetPages = pcall(function() return Players:GetFriendsAsync(targetUserId) end)
 
-        if loading.Parent then loading:Destroy() end
-        if not mutualFrame.Visible then return end
-        
-        local function createSectionHeader(text, color)
-            local h = Instance.new("TextLabel")
-            h.Text = text
-            h.Size = UDim2.new(1, 0, 0, 30)
-            h.BackgroundTransparency = 1
-            h.TextColor3 = color
-            h.Font = Enum.Font.GothamBlack
-            h.TextSize = 16
-            h.TextXAlignment = Enum.TextXAlignment.Left
-            h.ZIndex = 102
-            h.Parent = mfList
-            return h
-        end
+		if s2 then
+			local limit = 0
+			while true do
+				for _, item in ipairs(targetPages:GetCurrentPage()) do
+					table.insert(targetFriendsAll, item)
+				end
+				if targetPages.IsFinished or limit > 10 then break end
+				targetPages:AdvanceToNextPageAsync()
+				limit = limit + 1
+			end
+		else
+			loading.Text = "ไม่สามารถเข้าถึงรายชื่อเพื่อนได้ (Private)"
+			loading.TextColor3 = Color3.fromRGB(255, 80, 80)
+			return
+		end
 
-        local function createSmartPlayerRow(info, isMutual)
-            local row = Instance.new("TextButton")
-            row.Name = info.Username
-            row.Text = ""
-            row.AutoButtonColor = false
-            row.Size = UDim2.new(1, -10, 0, 40)
-            row.BackgroundColor3 = isMutual and Color3.fromRGB(60, 40, 80) or Color3.fromRGB(40, 40, 50)
-            row.BackgroundTransparency = 0.2
-            row.ZIndex = 102
-            row.Parent = mfList
-            
-            local statusColor = Color3.fromRGB(100, 100, 100) -- Offline (Grey)
-            local statusText = "ออฟไลน์"
-            
-            if info.Instance then
-                statusColor = Color3.fromRGB(85, 255, 127) -- In Server (Green)
-                statusText = "อยู่ในห้อง"
-            elseif info.IsOnline then
-                statusColor = Color3.fromRGB(0, 170, 255) -- Online elsewhere (Blue)
-                statusText = "ออนไลน์"
-            end
+		for _, f in ipairs(targetFriendsAll) do
+			local isMutual = myFriendsMap[f.Id]
+			local playerInServer = Players:GetPlayerByUserId(f.Id)
 
-            if info.Instance then
-                row.MouseButton1Click:Connect(function()
-                    startSpectating(info.Instance) -- Use helper function
-                end)
-            else
-                row.MouseButton1Click:Connect(function()
-                    if setclipboard then setclipboard(info.Username) end
-                end)
-            end
-            
-            local rowStroke = Instance.new("UIStroke", row)
-            rowStroke.Color = statusColor
-            rowStroke.Thickness = 1
-            rowStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
-            
-            local rCorner = Instance.new("UICorner", row)
-            rCorner.CornerRadius = UDim.new(0, 6)
-            
-            local icon = Instance.new("ImageLabel")
-            icon.Size = UDim2.new(0, 30, 0, 30)
-            icon.Position = UDim2.new(0, 5, 0.5, -15)
-            icon.BackgroundColor3 = THEME_DARK_BG
-            icon.ZIndex = 103
-            icon.Parent = row
-            
-            local rCorner2 = Instance.new("UICorner", icon)
-            rCorner2.CornerRadius = UDim.new(1,0)
-            
-            task.spawn(function()
-                icon.Image = Players:GetUserThumbnailAsync(info.Id, Enum.ThumbnailType.HeadShot, Enum.ThumbnailSize.Size48x48)
-            end)
-            
-            local nm = Instance.new("TextLabel")
-            nm.Text = info.DisplayName .. " (@" .. info.Username .. ")"
-            nm.Size = UDim2.new(1, -90, 0.6, 0) 
-            nm.Position = UDim2.new(0, 45, 0, 0)
-            nm.BackgroundTransparency = 1
-            nm.TextColor3 = THEME_WHITE
-            nm.Font = Enum.Font.Gotham
-            nm.TextSize = 14
-            nm.TextXAlignment = Enum.TextXAlignment.Left
-            nm.ZIndex = 103
-            nm.Parent = row
+			if isMutual then
+				table.insert(mutuals, {
+					Id = f.Id,
+					Username = f.Username,
+					DisplayName = f.DisplayName,
+					IsOnline = f.IsOnline,
+					Instance = playerInServer
+				})
+			elseif playerInServer then
+				table.insert(othersInServer, playerInServer)
+			end
+		end
 
-            local st = Instance.new("TextLabel")
-            st.Text = "สถานะ: " .. statusText
-            st.Size = UDim2.new(1, -90, 0.4, 0)
-            st.Position = UDim2.new(0, 45, 0.6, 0)
-            st.BackgroundTransparency = 1
-            st.TextColor3 = statusColor
-            st.Font = Enum.Font.GothamMedium
-            st.TextSize = 12
-            st.TextXAlignment = Enum.TextXAlignment.Left
-            st.ZIndex = 103
-            st.Parent = row
-            
-            -- [NEW] Add Buttons (Copy/Block) to the right side
-            local currentRightOffset = -5
-            
-            -- 1. Copy Button
-            local copyBtn = Instance.new("TextButton")
-            copyBtn.Name = "MiniCopy"
-            copyBtn.Text = "❐"
-            copyBtn.Size = UDim2.new(0, 30, 0, 30)
-            copyBtn.Position = UDim2.new(1, currentRightOffset - 30, 0.5, -15)
-            copyBtn.BackgroundTransparency = 1
-            copyBtn.TextColor3 = THEME_WHITE
-            copyBtn.Font = Enum.Font.GothamBold
-            copyBtn.TextSize = 14
-            copyBtn.ZIndex = 105
-            copyBtn.Parent = row
-            
-            copyBtn.MouseButton1Click:Connect(function()
-                if setclipboard then
-                    setclipboard(info.Username)
-                    local old = copyBtn.Text
-                    copyBtn.Text = "✓"
-                    copyBtn.TextColor3 = Color3.fromRGB(85, 255, 127)
-                    task.wait(1)
-                    copyBtn.Text = old
-                    copyBtn.TextColor3 = THEME_WHITE
-                end
-            end)
-            
-            currentRightOffset = currentRightOffset - 35
-            
-            -- 2. Block Button (Only if instance exists/in server)
-            if info.Instance then
-                local blockBtn = Instance.new("TextButton")
-                blockBtn.Name = "MiniBlock"
-                blockBtn.Text = "🛡️"
-                blockBtn.Size = UDim2.new(0, 30, 0, 30)
-                blockBtn.Position = UDim2.new(1, currentRightOffset - 30, 0.5, -15)
-                blockBtn.BackgroundTransparency = 1
-                blockBtn.TextColor3 = Color3.fromRGB(150, 150, 150)
-                blockBtn.Font = Enum.Font.GothamBold
-                blockBtn.TextSize = 14
-                blockBtn.ZIndex = 105
-                blockBtn.Parent = row
-                
-                -- Init state
-                task.spawn(function()
-                    local blockedUsers = {}
-                    pcall(function() blockedUsers = StarterGui:GetCore("GetBlockedUserIds") end)
-                    for _, id in ipairs(blockedUsers) do
-                        if id == info.Id then
-                            blockBtn.Text = "🚫"
-                            blockBtn.TextColor3 = Color3.fromRGB(255, 100, 100)
-                            break
-                        end
-                    end
-                end)
-                
-                blockBtn.MouseButton1Click:Connect(function()
-                    pcall(function()
-                        local blockedUsers = {}
-                        pcall(function() blockedUsers = StarterGui:GetCore("GetBlockedUserIds") end)
-                        local isBlocked = false
-                        for _, id in ipairs(blockedUsers) do
-                            if id == info.Id then isBlocked = true; break end
-                        end
-                        
-                        if isBlocked then
-                            StarterGui:SetCore("PromptUnblockPlayer", info.Instance)
-                        else
-                            StarterGui:SetCore("PromptBlockPlayer", info.Instance)
-                        end
-                    end)
-                end)
-                
-                currentRightOffset = currentRightOffset - 35
-            end
-        end
+		if loading.Parent then loading:Destroy() end
+		if not mutualFrame.Visible then return end
 
-        if #mutuals > 0 then
-            table.sort(mutuals, function(a, b)
-                local scoreA = (a.Instance and 2) or (a.IsOnline and 1) or 0
-                local scoreB = (b.Instance and 2) or (b.IsOnline and 1) or 0
-                return scoreA > scoreB
-            end)
+		local function createSectionHeader(text, color)
+			local h = Instance.new("TextLabel")
+			h.Text = text
+			h.Size = UDim2.new(1, 0, 0, 30)
+			h.BackgroundTransparency = 1
+			h.TextColor3 = color
+			h.Font = Enum.Font.GothamBlack
+			h.TextSize = 16
+			h.TextXAlignment = Enum.TextXAlignment.Left
+			h.ZIndex = 102
+			h.Parent = mfList
+			return h
+		end
 
-            createSectionHeader("🌟 เพื่อนร่วมกัน (ทั้งหมด " .. #mutuals .. ")", THEME_MAIN)
-            for _, info in ipairs(mutuals) do
-                createSmartPlayerRow(info, true)
-            end
-        else
-             createSectionHeader("🌟 เพื่อนร่วมกัน (0)", Color3.fromRGB(150, 150, 150))
-        end
+		local function createSmartPlayerRow(info, isMutual)
+			local row = Instance.new("TextButton")
+			row.Name = info.Username
+			row.Text = ""
+			row.AutoButtonColor = false
+			row.Size = UDim2.new(1, -10, 0, 40)
+			row.BackgroundColor3 = isMutual and Color3.fromRGB(60, 40, 80) or Color3.fromRGB(40, 40, 50)
+			row.BackgroundTransparency = 0.2
+			row.ZIndex = 102
+			row.Parent = mfList
 
-        if #othersInServer > 0 then
-            local spacer = Instance.new("Frame")
-            spacer.Size = UDim2.new(1, 0, 0, 15)
-            spacer.BackgroundTransparency = 1
-            spacer.Parent = mfList
+			local statusColor = Color3.fromRGB(100, 100, 100) 
+			local statusText = "ออฟไลน์"
 
-            createSectionHeader("👥 เพื่อนของเขาในห้องนี้ (" .. #othersInServer .. ")", Color3.fromRGB(255, 150, 50))
-            for _, p in ipairs(othersInServer) do
-                local info = {
-                    Id = p.UserId,
-                    Username = p.Name,
-                    DisplayName = p.DisplayName,
-                    IsOnline = true,
-                    Instance = p
-                }
-                createSmartPlayerRow(info, false)
-            end
-        end
-    end)
+			if info.Instance then
+				statusColor = Color3.fromRGB(85, 255, 127) 
+				statusText = "อยู่ในห้อง"
+			elseif info.IsOnline then
+				statusColor = Color3.fromRGB(0, 170, 255) 
+				statusText = "ออนไลน์"
+			end
+
+			if info.Instance then
+				row.MouseButton1Click:Connect(function()
+					startSpectating(info.Instance) 
+				end)
+			else
+				row.MouseButton1Click:Connect(function()
+					if setclipboard then setclipboard(info.Username) end
+				end)
+			end
+
+			local rowStroke = Instance.new("UIStroke", row)
+			rowStroke.Color = statusColor
+			rowStroke.Thickness = 1
+			rowStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+
+			local rCorner = Instance.new("UICorner", row)
+			rCorner.CornerRadius = UDim.new(0, 6)
+
+			local icon = Instance.new("ImageLabel")
+			icon.Size = UDim2.new(0, 30, 0, 30)
+			icon.Position = UDim2.new(0, 5, 0.5, -15)
+			icon.BackgroundColor3 = THEME_DARK_BG
+			icon.ZIndex = 103
+			icon.Parent = row
+
+			local rCorner2 = Instance.new("UICorner", icon)
+			rCorner2.CornerRadius = UDim.new(1,0)
+
+			task.spawn(function()
+				icon.Image = Players:GetUserThumbnailAsync(info.Id, Enum.ThumbnailType.HeadShot, Enum.ThumbnailSize.Size48x48)
+			end)
+
+			local nm = Instance.new("TextLabel")
+			nm.Text = info.DisplayName .. " (@" .. info.Username .. ")"
+			nm.Size = UDim2.new(1, -90, 0.6, 0)
+			nm.Position = UDim2.new(0, 45, 0, 0)
+			nm.BackgroundTransparency = 1
+			nm.TextColor3 = THEME_WHITE
+			nm.Font = Enum.Font.Gotham
+			nm.TextSize = 14
+			nm.TextXAlignment = Enum.TextXAlignment.Left
+			nm.ZIndex = 103
+			nm.Parent = row
+
+			local st = Instance.new("TextLabel")
+			st.Text = "สถานะ: " .. statusText
+			st.Size = UDim2.new(1, -90, 0.4, 0)
+			st.Position = UDim2.new(0, 45, 0.6, 0)
+			st.BackgroundTransparency = 1
+			st.TextColor3 = statusColor
+			st.Font = Enum.Font.GothamMedium
+			st.TextSize = 12
+			st.TextXAlignment = Enum.TextXAlignment.Left
+			st.ZIndex = 103
+			st.Parent = row
+
+			local currentRightOffset = -5
+
+			-- 1. Copy Button
+			local copyBtn = Instance.new("TextButton")
+			copyBtn.Name = "MiniCopy"
+			copyBtn.Text = "❐"
+			copyBtn.Size = UDim2.new(0, 30, 0, 30)
+			copyBtn.Position = UDim2.new(1, currentRightOffset - 30, 0.5, -15)
+			copyBtn.BackgroundTransparency = 1
+			copyBtn.TextColor3 = THEME_WHITE
+			copyBtn.Font = Enum.Font.GothamBold
+			copyBtn.TextSize = 14
+			copyBtn.ZIndex = 105
+			copyBtn.Parent = row
+
+			copyBtn.MouseButton1Click:Connect(function()
+				if setclipboard then
+					setclipboard(info.Username)
+					local old = copyBtn.Text
+					copyBtn.Text = "✓"
+					copyBtn.TextColor3 = Color3.fromRGB(85, 255, 127)
+					task.wait(1)
+					copyBtn.Text = old
+					copyBtn.TextColor3 = THEME_WHITE
+				end
+			end)
+
+			currentRightOffset = currentRightOffset - 35
+
+			-- 2. Block Button
+			if info.Instance then
+				local blockBtn = Instance.new("TextButton")
+				blockBtn.Name = "MiniBlock"
+				blockBtn.Text = "🛡️"
+				blockBtn.Size = UDim2.new(0, 30, 0, 30)
+				blockBtn.Position = UDim2.new(1, currentRightOffset - 30, 0.5, -15)
+				blockBtn.BackgroundTransparency = 1
+				blockBtn.TextColor3 = Color3.fromRGB(150, 150, 150)
+				blockBtn.Font = Enum.Font.GothamBold
+				blockBtn.TextSize = 14
+				blockBtn.ZIndex = 105
+				blockBtn.Parent = row
+
+				task.spawn(function()
+					local blockedUsers = {}
+					pcall(function() blockedUsers = StarterGui:GetCore("GetBlockedUserIds") end)
+					for _, id in ipairs(blockedUsers) do
+						if id == info.Id then
+							blockBtn.Text = "🚫"
+							blockBtn.TextColor3 = Color3.fromRGB(255, 100, 100)
+							break
+						end
+					end
+				end)
+
+				blockBtn.MouseButton1Click:Connect(function()
+					pcall(function()
+						local blockedUsers = {}
+						pcall(function() blockedUsers = StarterGui:GetCore("GetBlockedUserIds") end)
+						local isBlocked = false
+						for _, id in ipairs(blockedUsers) do
+							if id == info.Id then isBlocked = true; break end
+						end
+
+						if isBlocked then
+							StarterGui:SetCore("PromptUnblockPlayer", info.Instance)
+						else
+							StarterGui:SetCore("PromptBlockPlayer", info.Instance)
+						end
+					end)
+				end)
+
+				currentRightOffset = currentRightOffset - 35
+			end
+		end
+
+		if #mutuals > 0 then
+			table.sort(mutuals, function(a, b)
+				local scoreA = (a.Instance and 2) or (a.IsOnline and 1) or 0
+				local scoreB = (b.Instance and 2) or (b.IsOnline and 1) or 0
+				return scoreA > scoreB
+			end)
+
+			createSectionHeader("🌟 เพื่อนร่วมกัน (ทั้งหมด " .. #mutuals .. ")", THEME_MAIN)
+			for _, info in ipairs(mutuals) do
+				createSmartPlayerRow(info, true)
+			end
+		else
+			createSectionHeader("🌟 เพื่อนร่วมกัน (0)", Color3.fromRGB(150, 150, 150))
+		end
+
+		if #othersInServer > 0 then
+			local spacer = Instance.new("Frame")
+			spacer.Size = UDim2.new(1, 0, 0, 15)
+			spacer.BackgroundTransparency = 1
+			spacer.Parent = mfList
+
+			createSectionHeader("👥 เพื่อนของเขาในห้องนี้ (" .. #othersInServer .. ")", Color3.fromRGB(255, 150, 50))
+			for _, p in ipairs(othersInServer) do
+				local info = {
+					Id = p.UserId,
+					Username = p.Name,
+					DisplayName = p.DisplayName,
+					IsOnline = true,
+					Instance = p
+				}
+				createSmartPlayerRow(info, false)
+			end
+		end
+	end)
 end
 
 updatePlayerList = function()
-    for _, child in pairs(listFrame:GetChildren()) do
-        if child:IsA("TextButton") then child:Destroy() end
-    end
+	for _, child in pairs(listFrame:GetChildren()) do
+		if child:IsA("TextButton") then child:Destroy() end
+	end
 
-    local searchText = string.lower(searchBox.Text)
-    
-    local blockedUsers = {}
-    pcall(function()
-        blockedUsers = StarterGui:GetCore("GetBlockedUserIds")
-    end)
-    local function isUserBlocked(userId)
-        for _, id in ipairs(blockedUsers) do
-            if id == userId then return true end
-        end
-        return false
-    end
+	local searchText = string.lower(searchBox.Text)
 
-    for _, player in ipairs(Players:GetPlayers()) do
-        local pName = string.lower(player.Name)
-        local pDisplay = string.lower(player.DisplayName)
-        
-        if searchText == "" or string.find(pName, searchText) or string.find(pDisplay, searchText) then
-            
-            local entry = Instance.new("TextButton")
-            entry.Name = player.Name
-            entry.Size = UDim2.new(0.9, 0, 0, 50)
-            entry.BackgroundColor3 = THEME_PURPLE
-            entry.BackgroundTransparency = 0.4
-            entry.Text = ""
-            entry.AutoButtonColor = false
-            entry.Parent = listFrame
-            entry:SetAttribute("UserId", player.UserId)
+	local blockedUsers = {}
+	pcall(function()
+		blockedUsers = StarterGui:GetCore("GetBlockedUserIds")
+	end)
+	local function isUserBlocked(userId)
+		for _, id in ipairs(blockedUsers) do
+			if id == userId then return true end
+		end
+		return false
+	end
 
-            local entryCorner = Instance.new("UICorner", entry)
-            entryCorner.CornerRadius = UDim.new(0, 8)
-            
-            local entryStroke = Instance.new("UIStroke", entry)
-            entryStroke.Color = Color3.fromRGB(60, 70, 90)
-            entryStroke.Thickness = 1
-            entryStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+	for _, player in ipairs(Players:GetPlayers()) do
+		local pName = string.lower(player.Name)
+		local pDisplay = string.lower(player.DisplayName)
 
-            local avatarImg = Instance.new("ImageLabel")
-            avatarImg.Name = "Avatar"
-            avatarImg.Size = UDim2.new(0, 36, 0, 36)
-            avatarImg.Position = UDim2.new(0, 8, 0.5, -18)
-            avatarImg.BackgroundColor3 = THEME_DARK_BG
-            avatarImg.BackgroundTransparency = 0.5
-            avatarImg.Parent = entry
-            
-            local avatarStroke = Instance.new("UIStroke", avatarImg)
-            avatarStroke.Color = THEME_MAIN
-            avatarStroke.Thickness = 1
+		if searchText == "" or string.find(pName, searchText) or string.find(pDisplay, searchText) then
 
-            task.spawn(function()
-                local content = Players:GetUserThumbnailAsync(player.UserId, Enum.ThumbnailType.HeadShot, Enum.ThumbnailSize.Size48x48)
-                avatarImg.Image = content
-            end)
+			local entry = Instance.new("TextButton")
+			entry.Name = player.Name
+			entry.Size = UDim2.new(0.9, 0, 0, 50)
+			entry.BackgroundColor3 = THEME_PURPLE
+			entry.BackgroundTransparency = 0.4
+			entry.Text = ""
+			entry.AutoButtonColor = false
+			entry.Parent = listFrame
+			entry:SetAttribute("UserId", player.UserId)
 
-            local txt = Instance.new("TextLabel")
-            txt.Size = UDim2.new(1, -135, 1, 0)  
-            txt.Position = UDim2.new(0, 55, 0, 0)
-            txt.BackgroundTransparency = 1
-            txt.TextColor3 = THEME_WHITE
-            txt.Font = Enum.Font.GothamMedium
-            txt.TextSize = 19
-            txt.TextXAlignment = Enum.TextXAlignment.Left
-            txt.Text = player.DisplayName .. "\n<font size='14' color='#aaaaaa'>@" .. player.Name .. "</font>"
-            txt.RichText = true
-            txt.Parent = entry
-            
-            -- 1. ปุ่ม Copy Name
-            local copyBtn = Instance.new("TextButton")
-            copyBtn.Name = "CopyButton"
-            copyBtn.Text = "❐" 
-            copyBtn.TextSize = 16
-            copyBtn.TextColor3 = THEME_WHITE
-            copyBtn.BackgroundColor3 = THEME_DARK_BG
-            copyBtn.BackgroundTransparency = 0.5
-            copyBtn.Size = UDim2.new(0, 30, 0, 30)
-            copyBtn.Position = UDim2.new(1, -35, 0.5, -15) 
-            copyBtn.Font = Enum.Font.GothamBold
-            copyBtn.ZIndex = 2 
-            copyBtn.Parent = entry
+			local entryCorner = Instance.new("UICorner", entry)
+			entryCorner.CornerRadius = UDim.new(0, 8)
 
-            local copyCorner = Instance.new("UICorner", copyBtn)
-            copyCorner.CornerRadius = UDim.new(0, 6)
-            local copyStroke = Instance.new("UIStroke", copyBtn)
-            copyStroke.Color = THEME_MAIN
-            copyStroke.Thickness = 1
-            
-            copyBtn.MouseButton1Click:Connect(function()
-                if setclipboard then
-                    setclipboard(player.Name)
-                    local oldText = copyBtn.Text
-                    copyBtn.Text = "✓"
-                    copyBtn.TextColor3 = Color3.fromRGB(85, 255, 127)
-                    task.wait(1)
-                    if copyBtn then
-                        copyBtn.Text = oldText
-                        copyBtn.TextColor3 = THEME_WHITE
-                    end
-                end
-            end)
+			local entryStroke = Instance.new("UIStroke", entry)
+			entryStroke.Color = Color3.fromRGB(60, 70, 90)
+			entryStroke.Thickness = 1
+			entryStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
 
-            -- 2. ปุ่ม Mutual Friends
-            if player ~= localPlayer then
-                local mutualBtn = Instance.new("TextButton")
-                mutualBtn.Name = "MutualButton"
-                mutualBtn.Text = "👥"
-                mutualBtn.TextSize = 16
-                mutualBtn.TextColor3 = THEME_AKB_BLUE
-                mutualBtn.BackgroundColor3 = THEME_DARK_BG
-                mutualBtn.BackgroundTransparency = 0.5
-                mutualBtn.Size = UDim2.new(0, 30, 0, 30)
-                mutualBtn.Position = UDim2.new(1, -70, 0.5, -15) 
-                mutualBtn.Font = Enum.Font.GothamBold
-                mutualBtn.ZIndex = 2
-                mutualBtn.Parent = entry
+			local avatarImg = Instance.new("ImageLabel")
+			avatarImg.Name = "Avatar"
+			avatarImg.Size = UDim2.new(0, 36, 0, 36)
+			avatarImg.Position = UDim2.new(0, 8, 0.5, -18)
+			avatarImg.BackgroundColor3 = THEME_DARK_BG
+			avatarImg.BackgroundTransparency = 0.5
+			avatarImg.Parent = entry
 
-                local mCorner = Instance.new("UICorner", mutualBtn)
-                mCorner.CornerRadius = UDim.new(0, 6)
-                local mStroke = Instance.new("UIStroke", mutualBtn)
-                mStroke.Color = THEME_AKB_BLUE
-                mStroke.Thickness = 1
-                
-                mutualBtn.MouseButton1Click:Connect(function()
-                    showMutualFriends(player) 
-                end)
-                
-                -- 3. ปุ่ม Block
-                local blockBtn = Instance.new("TextButton")
-                blockBtn.Name = "BlockButton"
-                
-                local isBlocked = isUserBlocked(player.UserId)
-                blockBtn.Text = isBlocked and "🚫" or "🛡️"
-                
-                blockBtn.TextSize = 16
-                blockBtn.TextColor3 = isBlocked and Color3.fromRGB(255, 100, 100) or Color3.fromRGB(150, 150, 150)
-                blockBtn.BackgroundColor3 = THEME_DARK_BG
-                blockBtn.BackgroundTransparency = 0.5
-                blockBtn.Size = UDim2.new(0, 30, 0, 30)
-                blockBtn.Position = UDim2.new(1, -105, 0.5, -15) 
-                
-                blockBtn.Font = Enum.Font.GothamBold
-                blockBtn.ZIndex = 2
-                blockBtn.Parent = entry
-                
-                local bCorner = Instance.new("UICorner", blockBtn)
-                bCorner.CornerRadius = UDim.new(0, 6)
-                local bStroke = Instance.new("UIStroke", blockBtn)
-                bStroke.Color = isBlocked and Color3.fromRGB(255, 50, 50) or Color3.fromRGB(150, 150, 150)
-                bStroke.Thickness = 1
-                
-                blockBtn.MouseButton1Click:Connect(function()
-                    pcall(function()
-                        if isUserBlocked(player.UserId) then
-                             StarterGui:SetCore("PromptUnblockPlayer", player)
-                        else
-                             StarterGui:SetCore("PromptBlockPlayer", player)
-                        end
-                    end)
-                    
-                    task.spawn(function()
-                        local originalState = isUserBlocked(player.UserId)
-                        for i = 1, 5 do
-                            task.wait(1)
-                            local newState = false
-                            local success, blocks = pcall(function() return StarterGui:GetCore("GetBlockedUserIds") end)
-                            if success then
-                                for _, id in ipairs(blocks) do
-                                    if id == player.UserId then newState = true; break end
-                                end
-                            else
-                                newState = originalState
-                            end
-                            
-                            if newState ~= originalState then
-                                blockedStatus[player.UserId] = newState
-                                if newState == true then
-                                    friendStatus[player.UserId] = false 
-                                else
-                                    friendStatus[player.UserId] = false 
-                                end
+			local avatarStroke = Instance.new("UIStroke", avatarImg)
+			avatarStroke.Color = THEME_MAIN
+			avatarStroke.Thickness = 1
 
-                                updatePlayerList() 
-                                break
-                            end
-                        end
-                    end)
-                end)
-            end
+			task.spawn(function()
+				local content = Players:GetUserThumbnailAsync(player.UserId, Enum.ThumbnailType.HeadShot, Enum.ThumbnailSize.Size48x48)
+				avatarImg.Image = content
+			end)
 
-            entry.MouseButton1Click:Connect(function()
-                if player == localPlayer then
-                    camera.CameraSubject = localPlayer.Character.Humanoid
-                    spectatingPlayer = nil
-                    resetButton.Visible = false
-                    if Controls then Controls:Enable() end
-                else
-                    startSpectating(player) -- Use helper function
-                end
-                updateListSelection()
-            end)
-        end
-    end
-    updateListSelection()
+			local txt = Instance.new("TextLabel")
+			txt.Size = UDim2.new(1, -135, 1, 0)
+			txt.Position = UDim2.new(0, 55, 0, 0)
+			txt.BackgroundTransparency = 1
+			txt.TextColor3 = THEME_WHITE
+			txt.Font = Enum.Font.GothamMedium
+			txt.TextSize = 19
+			txt.TextXAlignment = Enum.TextXAlignment.Left
+			txt.Text = player.DisplayName .. "\n<font size='14' color='#aaaaaa'>@" .. player.Name .. "</font>"
+			txt.RichText = true
+			txt.Parent = entry
+
+			-- 1. ปุ่ม Copy Name
+			local copyBtn = Instance.new("TextButton")
+			copyBtn.Name = "CopyButton"
+			copyBtn.Text = "❐"
+			copyBtn.TextSize = 16
+			copyBtn.TextColor3 = THEME_WHITE
+			copyBtn.BackgroundColor3 = THEME_DARK_BG
+			copyBtn.BackgroundTransparency = 0.5
+			copyBtn.Size = UDim2.new(0, 30, 0, 30)
+			copyBtn.Position = UDim2.new(1, -35, 0.5, -15)
+			copyBtn.Font = Enum.Font.GothamBold
+			copyBtn.ZIndex = 2
+			copyBtn.Parent = entry
+
+			local copyCorner = Instance.new("UICorner", copyBtn)
+			copyCorner.CornerRadius = UDim.new(0, 6)
+			local copyStroke = Instance.new("UIStroke", copyBtn)
+			copyStroke.Color = THEME_MAIN
+			copyStroke.Thickness = 1
+
+			copyBtn.MouseButton1Click:Connect(function()
+				if setclipboard then
+					setclipboard(player.Name)
+					local oldText = copyBtn.Text
+					copyBtn.Text = "✓"
+					copyBtn.TextColor3 = Color3.fromRGB(85, 255, 127)
+					task.wait(1)
+					if copyBtn then
+						copyBtn.Text = oldText
+						copyBtn.TextColor3 = THEME_WHITE
+					end
+				end
+			end)
+
+			-- 2. ปุ่ม Mutual Friends
+			if player ~= localPlayer then
+				local mutualBtn = Instance.new("TextButton")
+				mutualBtn.Name = "MutualButton"
+				mutualBtn.Text = "👥"
+				mutualBtn.TextSize = 16
+				mutualBtn.TextColor3 = THEME_AKB_BLUE
+				mutualBtn.BackgroundColor3 = THEME_DARK_BG
+				mutualBtn.BackgroundTransparency = 0.5
+				mutualBtn.Size = UDim2.new(0, 30, 0, 30)
+				mutualBtn.Position = UDim2.new(1, -70, 0.5, -15)
+				mutualBtn.Font = Enum.Font.GothamBold
+				mutualBtn.ZIndex = 2
+				mutualBtn.Parent = entry
+
+				local mCorner = Instance.new("UICorner", mutualBtn)
+				mCorner.CornerRadius = UDim.new(0, 6)
+				local mStroke = Instance.new("UIStroke", mutualBtn)
+				mStroke.Color = THEME_AKB_BLUE
+				mStroke.Thickness = 1
+
+				mutualBtn.MouseButton1Click:Connect(function()
+					showMutualFriends(player)
+				end)
+
+				-- 3. ปุ่ม Block
+				local blockBtn = Instance.new("TextButton")
+				blockBtn.Name = "BlockButton"
+
+				local isBlocked = isUserBlocked(player.UserId)
+				blockBtn.Text = isBlocked and "🚫" or "🛡️"
+
+				blockBtn.TextSize = 16
+				blockBtn.TextColor3 = isBlocked and Color3.fromRGB(255, 100, 100) or Color3.fromRGB(150, 150, 150)
+				blockBtn.BackgroundColor3 = THEME_DARK_BG
+				blockBtn.BackgroundTransparency = 0.5
+				blockBtn.Size = UDim2.new(0, 30, 0, 30)
+				blockBtn.Position = UDim2.new(1, -105, 0.5, -15)
+
+				blockBtn.Font = Enum.Font.GothamBold
+				blockBtn.ZIndex = 2
+				blockBtn.Parent = entry
+
+				local bCorner = Instance.new("UICorner", blockBtn)
+				bCorner.CornerRadius = UDim.new(0, 6)
+				local bStroke = Instance.new("UIStroke", blockBtn)
+				bStroke.Color = isBlocked and Color3.fromRGB(255, 50, 50) or Color3.fromRGB(150, 150, 150)
+				bStroke.Thickness = 1
+
+				blockBtn.MouseButton1Click:Connect(function()
+					pcall(function()
+						if isUserBlocked(player.UserId) then
+							StarterGui:SetCore("PromptUnblockPlayer", player)
+						else
+							StarterGui:SetCore("PromptBlockPlayer", player)
+						end
+					end)
+
+					task.spawn(function()
+						local originalState = isUserBlocked(player.UserId)
+						for i = 1, 5 do
+							task.wait(1)
+							local newState = false
+							local success, blocks = pcall(function() return StarterGui:GetCore("GetBlockedUserIds") end)
+							if success then
+								for _, id in ipairs(blocks) do
+									if id == player.UserId then newState = true; break end
+								end
+							else
+								newState = originalState
+							end
+
+							if newState ~= originalState then
+								blockedStatus[player.UserId] = newState
+								if newState == true then
+									friendStatus[player.UserId] = false
+								else
+									friendStatus[player.UserId] = false
+								end
+
+								updatePlayerList()
+								break
+							end
+						end
+					end)
+				end)
+			end
+
+			entry.MouseButton1Click:Connect(function()
+				if player == localPlayer then
+					camera.CameraSubject = localPlayer.Character.Humanoid
+					spectatingPlayer = nil
+					resetButton.Visible = false
+					if Controls then Controls:Enable() end
+				else
+					startSpectating(player) 
+				end
+				updateListSelection()
+			end)
+		end
+	end
+	updateListSelection()
 end
 
 searchBox:GetPropertyChangedSignal("Text"):Connect(updatePlayerList)
 
 resetCameraToLocal = function()
-    if localPlayer.Character and localPlayer.Character:FindFirstChild("Humanoid") then
-        camera.CameraSubject = localPlayer.Character.Humanoid
-        spectatingPlayer = nil
-        resetButton.Visible = false
-        isFreeCamEnabled = false 
-        freeCamButton.Text = "📷 กล้องอิสระ: ปิด (Z)"
-        freeCamButton.UIStroke.Color = THEME_FREECAM
-        camera.CameraType = Enum.CameraType.Custom
-        
-        -- [FIX] Reset mouse behavior to avoid stuck cursor
-        UserInputService.MouseBehavior = Enum.MouseBehavior.Default
-        
-        if Controls then Controls:Enable() end
-        
-        updateListSelection()
-    end
+	if localPlayer.Character and localPlayer.Character:FindFirstChild("Humanoid") then
+		camera.CameraSubject = localPlayer.Character.Humanoid
+		spectatingPlayer = nil
+		resetButton.Visible = false
+		isFreeCamEnabled = false
+		freeCamButton.Text = "📷 กล้องอิสระ: ปิด (Z)"
+		freeCamButton.UIStroke.Color = THEME_FREECAM
+		camera.CameraType = Enum.CameraType.Custom
+
+		UserInputService.MouseBehavior = Enum.MouseBehavior.Default
+
+		if Controls then Controls:Enable() end
+
+		updateListSelection()
+	end
 end
 
 switchToNearestPlayer = function(excludedTarget)
-    local lastPos = nil
-    
-    -- [IMPROVED] Use cached position if character is gone (Death/Reset case)
-    if excludedTarget and excludedTarget.Character and excludedTarget.Character:FindFirstChild("HumanoidRootPart") then
-        lastPos = excludedTarget.Character.HumanoidRootPart.Position
-    elseif lastSpectatedPosition then
-        lastPos = lastSpectatedPosition
-    else
-        lastPos = camera.CFrame.Position
-    end
-    
-    local nextTarget = nil
-    local shortest = math.huge
-    
-    for _, p in ipairs(Players:GetPlayers()) do
-        if p ~= localPlayer and p ~= excludedTarget and p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
-            local dist = (p.Character.HumanoidRootPart.Position - lastPos).Magnitude
-            if dist < shortest then
-                shortest = dist
-                nextTarget = p
-            end
-        end
-    end
-    
-    if nextTarget then
-        startSpectating(nextTarget)
-        pcall(function()
-            StarterGui:SetCore("SendNotification", {
-                Title = "Auto Switch";
-                Text = "Target Lost/LowHP. Switching to: " .. nextTarget.DisplayName;
-                Duration = 3;
-            })
-        end)
-        damageCamLockUntil = tick() + 10 
-    else
-        resetCameraToLocal()
-    end
+	local lastPos = nil
+
+	if excludedTarget and excludedTarget.Character and excludedTarget.Character:FindFirstChild("HumanoidRootPart") then
+		lastPos = excludedTarget.Character.HumanoidRootPart.Position
+	elseif lastSpectatedPosition then
+		lastPos = lastSpectatedPosition
+	else
+		lastPos = camera.CFrame.Position
+	end
+
+	local nextTarget = nil
+	local shortest = math.huge
+
+	for _, p in ipairs(Players:GetPlayers()) do
+		if p ~= localPlayer and p ~= excludedTarget and p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
+			local dist = (p.Character.HumanoidRootPart.Position - lastPos).Magnitude
+			if dist < shortest then
+				shortest = dist
+				nextTarget = p
+			end
+		end
+	end
+
+	if nextTarget then
+		startSpectating(nextTarget)
+		pcall(function()
+			StarterGui:SetCore("SendNotification", {
+				Title = "Auto Switch";
+				Text = "Target Lost/LowHP. Switching to: " .. nextTarget.DisplayName;
+				Duration = 3;
+			})
+		end)
+		damageCamLockUntil = tick() + 10
+	else
+		resetCameraToLocal()
+	end
 end
 
 ssResetBtn.MouseButton1Click:Connect(resetCameraToLocal)
@@ -1636,460 +1639,475 @@ local camRotY = 0
 local isRightMouseDown = false
 
 local function toggleFreeCam()
-    isFreeCamEnabled = not isFreeCamEnabled
-    
-    if isFreeCamEnabled then
-        freeCamButton.Text = "📸 กล้องอิสระ: เปิด (Z)"
-        freeCamButton.UIStroke.Color = Color3.fromRGB(255, 100, 255)
-        camera.CameraType = Enum.CameraType.Scriptable
-        
-        if Controls then Controls:Disable() end
-        
-        local rx, ry, rz = camera.CFrame:ToEulerAnglesYXZ()
-        camRotX = rx
-        camRotY = ry
-        
-        resetButton.Visible = true 
-    else
-        freeCamButton.Text = "📷 กล้องอิสระ: ปิด (Z)"
-        freeCamButton.UIStroke.Color = THEME_FREECAM
-        camera.CameraType = Enum.CameraType.Custom
-        UserInputService.MouseBehavior = Enum.MouseBehavior.Default
-        
-        if spectatingPlayer and spectatingPlayer.Character then
-            if isCamLockRotation then
-                camera.CameraType = Enum.CameraType.Scriptable
-            else
-                camera.CameraType = Enum.CameraType.Custom
-                camera.CameraSubject = spectatingPlayer.Character:FindFirstChild("Humanoid")
-            end
-            
-            if Controls then Controls:Disable() end
-        elseif localPlayer.Character then
-            camera.CameraSubject = localPlayer.Character:FindFirstChild("Humanoid")
-            resetButton.Visible = false
-            if Controls then Controls:Enable() end
-        else
-            if Controls then Controls:Enable() end
-        end
-    end
+	isFreeCamEnabled = not isFreeCamEnabled
+
+	if isFreeCamEnabled then
+		-- [NEW] ยกเลิก Auto Cam ถ้าเปิดอยู่ตอนจะเข้าโหมดกล้องอิสระ
+		if isDamageCamEnabled then
+			isDamageCamEnabled = false
+			damageCamButton.Text = "🩸 Auto Cam: ปิด (V)"
+			damageCamButton.UIStroke.Color = THEME_DAMAGE_CAM
+			pcall(function()
+				StarterGui:SetCore("SendNotification", {
+					Title = "Auto Cam Disabled";
+					Text = "ระบบ Auto Cam ถูกปิดเพื่อใช้งานกล้องอิสระ";
+					Duration = 2;
+				})
+			end)
+		end
+
+		freeCamButton.Text = "📸 กล้องอิสระ: เปิด (Z)"
+		freeCamButton.UIStroke.Color = Color3.fromRGB(255, 100, 255)
+		camera.CameraType = Enum.CameraType.Scriptable
+
+		if Controls then Controls:Disable() end
+
+		local rx, ry, rz = camera.CFrame:ToEulerAnglesYXZ()
+		camRotX = rx
+		camRotY = ry
+
+		resetButton.Visible = true
+	else
+		freeCamButton.Text = "📷 กล้องอิสระ: ปิด (Z)"
+		freeCamButton.UIStroke.Color = THEME_FREECAM
+		camera.CameraType = Enum.CameraType.Custom
+		UserInputService.MouseBehavior = Enum.MouseBehavior.Default
+
+		if spectatingPlayer and spectatingPlayer.Character then
+			if isCamLockRotation then
+				camera.CameraType = Enum.CameraType.Scriptable
+			else
+				camera.CameraType = Enum.CameraType.Custom
+				camera.CameraSubject = spectatingPlayer.Character:FindFirstChild("Humanoid")
+			end
+
+			if Controls then Controls:Disable() end
+		elseif localPlayer.Character then
+			camera.CameraSubject = localPlayer.Character:FindFirstChild("Humanoid")
+			resetButton.Visible = false
+			if Controls then Controls:Enable() end
+		else
+			if Controls then Controls:Enable() end
+		end
+	end
 end
 
 local function clearAllESP()
-    espFolder:ClearAllChildren()
-    table.clear(nameplates)
-    
-    for _, player in ipairs(Players:GetPlayers()) do
-        if player.Character then
-            local h = player.Character:FindFirstChild("FantasyHighlight")
-            if h then h:Destroy() end
-        end
-    end
+	espFolder:ClearAllChildren()
+	table.clear(nameplates)
+
+	for _, player in ipairs(Players:GetPlayers()) do
+		if player.Character then
+			local h = player.Character:FindFirstChild("FantasyHighlight")
+			if h then h:Destroy() end
+		end
+	end
 end
 
 espButton.MouseButton1Click:Connect(function()
-    isEspEnabled = not isEspEnabled
-    espButton.Text = isEspEnabled and "✨ เนตรเวทย์: เปิด (X)" or "⚔️ เนตรเวทย์: ปิด (X)"
-    espButton.UIStroke.Color = isEspEnabled and THEME_MAIN or Color3.fromRGB(200, 60, 60)
-    if not isEspEnabled then clearAllESP() end
+	isEspEnabled = not isEspEnabled
+	espButton.Text = isEspEnabled and "✨ เนตรเวทย์: เปิด (X)" or "⚔️ เนตรเวทย์: ปิด (X)"
+	espButton.UIStroke.Color = isEspEnabled and THEME_MAIN or Color3.fromRGB(200, 60, 60)
+	if not isEspEnabled then clearAllESP() end
 end)
 
 damageCamButton.MouseButton1Click:Connect(function()
-    isDamageCamEnabled = not isDamageCamEnabled
-    damageCamButton.Text = isDamageCamEnabled and "🩸 Auto Cam: เปิด (V)" or "🩸 Auto Cam: ปิด (V)"
-    damageCamButton.UIStroke.Color = isDamageCamEnabled and Color3.fromRGB(85, 255, 127) or THEME_DAMAGE_CAM
+	isDamageCamEnabled = not isDamageCamEnabled
+	damageCamButton.Text = isDamageCamEnabled and "🩸 Auto Cam: เปิด (V)" or "🩸 Auto Cam: ปิด (V)"
+	damageCamButton.UIStroke.Color = isDamageCamEnabled and Color3.fromRGB(85, 255, 127) or THEME_DAMAGE_CAM
 end)
 
 UserInputService.InputBegan:Connect(function(input, gameProcessed)
-    local isTyping = UserInputService:GetFocusedTextBox() ~= nil
-    
-    if not isTyping then
-        if input.KeyCode == Enum.KeyCode.Z then
-            toggleFreeCam()
-        end
+	local isTyping = UserInputService:GetFocusedTextBox() ~= nil
 
-        if input.KeyCode == Enum.KeyCode.X then
-            isEspEnabled = not isEspEnabled
-            espButton.Text = isEspEnabled and "✨ เนตรเวทย์: เปิด (X)" or "⚔️ เนตรเวทย์: ปิด (X)"
-            espButton.UIStroke.Color = isEspEnabled and THEME_MAIN or Color3.fromRGB(200, 60, 60)
-            
-            if not isEspEnabled then 
-                clearAllESP() 
-            end
-        end
-        
-        -- [NEW] V key for Auto Damage Cam
-        if input.KeyCode == Enum.KeyCode.V then
-            isDamageCamEnabled = not isDamageCamEnabled
-            damageCamButton.Text = isDamageCamEnabled and "🩸 Auto Cam: เปิด (V)" or "🩸 Auto Cam: ปิด (V)"
-            damageCamButton.UIStroke.Color = isDamageCamEnabled and Color3.fromRGB(85, 255, 127) or THEME_DAMAGE_CAM
-            
-            -- Feedback Sound or Notification (Optional)
-            local stateText = isDamageCamEnabled and "Enabled" or "Disabled"
-            pcall(function()
-                StarterGui:SetCore("SendNotification", {
-                    Title = "Auto Cam";
-                    Text = "Auto Cam is now " .. stateText;
-                    Duration = 1.5;
-                })
-            end)
-        end
-    end
+	if not isTyping then
+		if input.KeyCode == Enum.KeyCode.Z then
+			toggleFreeCam()
+		end
 
-    if input.UserInputType == Enum.UserInputType.MouseButton2 then
-        isRightMouseDown = true
-        if isFreeCamEnabled then
-            UserInputService.MouseBehavior = Enum.MouseBehavior.LockCurrentPosition
-        end
-    end
+		if input.KeyCode == Enum.KeyCode.X then
+			isEspEnabled = not isEspEnabled
+			espButton.Text = isEspEnabled and "✨ เนตรเวทย์: เปิด (X)" or "⚔️ เนตรเวทย์: ปิด (X)"
+			espButton.UIStroke.Color = isEspEnabled and THEME_MAIN or Color3.fromRGB(200, 60, 60)
+
+			if not isEspEnabled then
+				clearAllESP()
+			end
+		end
+
+		if input.KeyCode == Enum.KeyCode.V then
+			isDamageCamEnabled = not isDamageCamEnabled
+			damageCamButton.Text = isDamageCamEnabled and "🩸 Auto Cam: เปิด (V)" or "🩸 Auto Cam: ปิด (V)"
+			damageCamButton.UIStroke.Color = isDamageCamEnabled and Color3.fromRGB(85, 255, 127) or THEME_DAMAGE_CAM
+
+			local stateText = isDamageCamEnabled and "Enabled" or "Disabled"
+			pcall(function()
+				StarterGui:SetCore("SendNotification", {
+					Title = "Auto Cam";
+					Text = "Auto Cam is now " .. stateText;
+					Duration = 1.5;
+				})
+			end)
+		end
+
+		if input.KeyCode == Enum.KeyCode.T then
+			screenGui.Enabled = not screenGui.Enabled
+			
+			pcall(function()
+				StarterGui:SetCore("SendNotification", {
+					Title = "AKB System";
+					Text = screenGui.Enabled and "แสดง UI แล้ว (T)" or "ซ่อน UI ทั้งหมด (T)";
+					Duration = 2;
+				})
+			end)
+		end
+	end
+
+	if input.UserInputType == Enum.UserInputType.MouseButton2 then
+		isRightMouseDown = true
+		if isFreeCamEnabled then
+			UserInputService.MouseBehavior = Enum.MouseBehavior.LockCurrentPosition
+		end
+	end
 end)
 
 UserInputService.InputEnded:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton2 then
-        isRightMouseDown = false
-        if isFreeCamEnabled then
-            UserInputService.MouseBehavior = Enum.MouseBehavior.Default
-        end
-    end
+	if input.UserInputType == Enum.UserInputType.MouseButton2 then
+		isRightMouseDown = false
+		if isFreeCamEnabled then
+			UserInputService.MouseBehavior = Enum.MouseBehavior.Default
+		end
+	end
 end)
 
 UserInputService.InputChanged:Connect(function(input)
-    if isFreeCamEnabled and isRightMouseDown and input.UserInputType == Enum.UserInputType.MouseMovement then
-        local delta = input.Delta
-        local sens = 0.005
-        
-        camRotX = camRotX - (delta.Y * sens)
-        camRotY = camRotY - (delta.X * sens)
-    end
+	if isFreeCamEnabled and isRightMouseDown and input.UserInputType == Enum.UserInputType.MouseMovement then
+		local delta = input.Delta
+		local sens = 0.005
+
+		camRotX = camRotX - (delta.Y * sens)
+		camRotY = camRotY - (delta.X * sens)
+	end
+
+	-- [NEW] ระบบซูมเข้าออกตอนล็อคกล้อง (ใช้ลูกกลิ้งเมาส์)
+	if input.UserInputType == Enum.UserInputType.MouseWheel then
+		if spectatingPlayer and isCamLockRotation and not isFreeCamEnabled then
+			-- ยิ่งเลื่อนลูกกลิ้งขึ้น (Z > 0) ระยะจะลดลง (ซูมเข้า) / เลื่อนลงระยะเพิ่มขึ้น (ซูมออก)
+			-- ล็อคค่าให้ซูมเข้าได้สุดที่ 5 studs และซูมออกสุดที่ 120 studs
+			spectateZoomDistance = math.clamp(spectateZoomDistance - (input.Position.Z * 5), 5, 120)
+		end
+	end
 end)
 
 freeCamButton.MouseButton1Click:Connect(toggleFreeCam)
 
 local lastTime = tick()
-local joinTime = tick() -- [NEW] ตัวแปรเก็บเวลาตอนสคริปต์เริ่มทำงาน
+local joinTime = tick() 
 
--- [CRITICAL] เก็บ Connection ใส่ตาราง global เพื่อล้างค่าได้
 local renderSteppedConnection = RunService.RenderStepped:Connect(function(dt)
-    local currentTime = tick()
-    
-    -- [NEW] Auto Damage Cam Logic
-    if isDamageCamEnabled then
-        if spectatingPlayer and spectatingPlayer.Character then
-             local sHum = spectatingPlayer.Character:FindFirstChild("Humanoid")
-             local sRoot = spectatingPlayer.Character:FindFirstChild("HumanoidRootPart")
-             
-             -- [NEW] Track position continuously for better switch logic
-             if sRoot then
-                 lastSpectatedPosition = sRoot.Position
-             end
-             
-             -- Check if dead or health <= 0 (Suicide/Reset) or Low HP
-             if sHum and (sHum.Health <= 0 or (sHum.Health / sHum.MaxHealth) < 0.3) then
-                 switchToNearestPlayer(spectatingPlayer)
-             end
-        end
+	local currentTime = tick()
 
-        for _, player in ipairs(Players:GetPlayers()) do
-            if player ~= localPlayer and player.Character then
-                local hum = player.Character:FindFirstChild("Humanoid")
-                if hum then
-                    local currentHealth = hum.Health
-                    local prevHealth = previousHealths[player.UserId] or currentHealth
-                    
-                    if currentHealth < prevHealth and currentHealth > 0 then
-                        if spectatingPlayer == player then
-                            -- Already watching
-                        elseif spectatingPlayer == nil then
-                            startSpectating(player)
-                            damageCamLockUntil = currentTime + 10
-                        else
-                            if currentTime > damageCamLockUntil then
-                                startSpectating(player)
-                                damageCamLockUntil = currentTime + 10
-                            end
-                        end
-                    end
-                    previousHealths[player.UserId] = currentHealth
-                end
-            end
-        end
-    end
-    
-    if currentTime - lastTime >= 1 then
-        local pingValue = math.round(localPlayer:GetNetworkPing() * 1000)
-        
-        if pingValue < 100 then
-            pingLabel.TextColor3 = HEALTH_COLOR_FULL 
-        elseif pingValue < 200 then
-            pingLabel.TextColor3 = Color3.fromRGB(255, 255, 85) 
-        else
-            pingLabel.TextColor3 = HEALTH_COLOR_LOW 
-        end
-        
-        pingLabel.Text = "Ping: " .. pingValue .. " ms"
-        
-        local currentPlayers = #Players:GetPlayers()
-        local maxPlayers = Players.MaxPlayers
-        playersCountLabel.Text = string.format("Players: %d/%d", currentPlayers, maxPlayers)
+	if isDamageCamEnabled then
+		if spectatingPlayer and spectatingPlayer.Character then
+			local sHum = spectatingPlayer.Character:FindFirstChild("Humanoid")
+			local sRoot = spectatingPlayer.Character:FindFirstChild("HumanoidRootPart")
 
-        local nonFriendCount = 0
-        for _, p in ipairs(Players:GetPlayers()) do
-            if p ~= localPlayer then
-                if not friendStatus[p.UserId] then
-                    nonFriendCount = nonFriendCount + 1
-                end
-            end
-        end
-        nonFriendsLabel.Text = "Enemies: " .. nonFriendCount
-        
-        -- [UPDATED] คำนวณเวลาตั้งแต่เริ่มรันสคริปต์ (เวลาที่อยู่ในเซิร์ฟเวอร์นี้)
-        local timeInSeconds = math.floor(tick() - joinTime)
-        local hours = math.floor(timeInSeconds / 3600)
-        local minutes = math.floor((timeInSeconds % 3600) / 60)
-        local seconds = timeInSeconds % 60
-        timeLabel.Text = string.format("Time: %02d.%02d.%02d", hours, minutes, seconds)
+			if sRoot then
+				lastSpectatedPosition = sRoot.Position
+			end
 
-        lastTime = currentTime
-    end
+			if sHum and (sHum.Health <= 0 or (sHum.Health / sHum.MaxHealth) < 0.3) then
+				switchToNearestPlayer(spectatingPlayer)
+			end
+		end
 
-    if isFreeCamEnabled then
-        local moveVec = Vector3.new()
-        
-        if UserInputService:IsKeyDown(Enum.KeyCode.W) then moveVec = moveVec + Vector3.new(0, 0, -1) end
-        if UserInputService:IsKeyDown(Enum.KeyCode.S) then moveVec = moveVec + Vector3.new(0, 0, 1) end
-        if UserInputService:IsKeyDown(Enum.KeyCode.A) then moveVec = moveVec + Vector3.new(-1, 0, 0) end
-        if UserInputService:IsKeyDown(Enum.KeyCode.D) then moveVec = moveVec + Vector3.new(1, 0, 0) end
-        if UserInputService:IsKeyDown(Enum.KeyCode.Q) then moveVec = moveVec + Vector3.new(0, -1, 0) end
-        if UserInputService:IsKeyDown(Enum.KeyCode.E) then moveVec = moveVec + Vector3.new(0, 1, 0) end
-        
-        local currentSpeed = freeCamSpeed
-        if UserInputService:IsKeyDown(Enum.KeyCode.LeftShift) then currentSpeed = freeCamSpeed * 2.5 end
-        
-        local rotCFrame = CFrame.fromEulerAnglesYXZ(camRotX, camRotY, 0)
-        local newPos = camera.CFrame.Position + (rotCFrame * moveVec * currentSpeed * dt)
-        
-        camera.CFrame = CFrame.new(newPos) * rotCFrame
-    
-    elseif spectatingPlayer then
-        if not spectatingPlayer.Parent or not spectatingPlayer.Character or not spectatingPlayer.Character:FindFirstChild("Humanoid") then
-            -- Note: We handle switch in loop/PlayerRemoving now, but fallback here
-            -- Don't reset instantly if we expect a switch
-        else
-            if isCamLockRotation and spectatingPlayer.Character:FindFirstChild("HumanoidRootPart") then
-                 camera.CameraType = Enum.CameraType.Scriptable
-                 
-                 local hrp = spectatingPlayer.Character.HumanoidRootPart
-                 local targetCFrame = hrp.CFrame * CFrame.new(0, 3, 10)
-                 
-                 -- [FIX] ใช้ค่า Delta Time (dt) เพื่อให้ความสมูทของการแพนกล้องไม่อิงกับเฟรมเรต ป้องกันการกระตุก
-                 camera.CFrame = camera.CFrame:Lerp(targetCFrame, 1 - math.exp(-15 * dt))
-            else
-                 camera.CameraType = Enum.CameraType.Custom
-                 if camera.CameraSubject ~= spectatingPlayer.Character.Humanoid then
-                     camera.CameraSubject = spectatingPlayer.Character.Humanoid
-                 end
-            end
-        end
-    end
-    
-    if isEspEnabled then
-        local camPos = camera.CFrame.Position
-        
-        for _, player in ipairs(Players:GetPlayers()) do
-            if player == localPlayer then continue end
-            local targetChar = player.Character
-            
-            if targetChar and targetChar.Parent then
-                local head = targetChar:FindFirstChild("Head")
-                local rootPart = targetChar:FindFirstChild("HumanoidRootPart")
-                local humanoid = targetChar:FindFirstChild("Humanoid")
-                
-                if head and rootPart then
-                    local distance = (rootPart.Position - camPos).Magnitude
-                    
-                    if distance <= maxEspDistance then
-                        local isFriend = friendStatus[player.UserId]
-                        local isBlocked = blockedStatus[player.UserId]
-                        
-                        local espColor = COLOR_ENEMY
-                        if isBlocked then
-                            espColor = COLOR_BLOCKED_USER
-                        elseif isFriend then
-                            espColor = THEME_MAIN
-                        end
+		for _, player in ipairs(Players:GetPlayers()) do
+			if player ~= localPlayer and player.Character then
+				local hum = player.Character:FindFirstChild("Humanoid")
+				if hum then
+					local currentHealth = hum.Health
+					local prevHealth = previousHealths[player.UserId] or currentHealth
 
-                        local billboard = nameplates[player]
-                        
-                        if not billboard or billboard.Adornee ~= head then
-                            if billboard then billboard:Destroy() end
-                            billboard = Instance.new("BillboardGui")
-                            billboard.Name = "TextOnlyESP"
-                            billboard.Size = UDim2.new(0, 140, 0, 50)
-                            billboard.StudsOffset = Vector3.new(0, 3.5, 0)
-                            billboard.AlwaysOnTop = true
-                            billboard.Active = true 
-                            
-                            billboard.Parent = espFolder 
-                            billboard.Adornee = head 
-                            
-                            local clickBtn = Instance.new("TextButton")
-                            clickBtn.Name = "ClickToSpectate"
-                            clickBtn.Size = UDim2.new(1, 0, 1, 0)
-                            clickBtn.BackgroundTransparency = 1
-                            clickBtn.Text = ""
-                            clickBtn.ZIndex = 10 
-                            clickBtn.Parent = billboard
+					if currentHealth < prevHealth and currentHealth > 0 then
+						if spectatingPlayer == player then
+							-- Already watching
+						elseif spectatingPlayer == nil then
+							startSpectating(player)
+							damageCamLockUntil = currentTime + 10
+						else
+							if currentTime > damageCamLockUntil then
+								startSpectating(player)
+								damageCamLockUntil = currentTime + 10
+							end
+						end
+					end
+					previousHealths[player.UserId] = currentHealth
+				end
+			end
+		end
+	end
 
-                            clickBtn.MouseButton1Click:Connect(function()
-                                 startSpectating(player)
-                            end)
-                            
-                            local displayNameLabel = Instance.new("TextLabel", billboard)
-                            displayNameLabel.Name = "DisplayLabel"
-                            displayNameLabel.Size = UDim2.new(1, 0, 0.4, 0)
-                            displayNameLabel.Position = UDim2.new(0, 0, 0, 0)
-                            displayNameLabel.BackgroundTransparency = 1
-                            displayNameLabel.Font = Enum.Font.GothamMedium
-                            displayNameLabel.TextScaled = true 
-                            displayNameLabel.TextStrokeTransparency = 0.5
-                            displayNameLabel.Text = player.DisplayName
-                            
-                            local userNameLabel = Instance.new("TextLabel", billboard)
-                            userNameLabel.Size = UDim2.new(1, 0, 0.3, 0)
-                            userNameLabel.Position = UDim2.new(0, 0, 0.4, 0)
-                            userNameLabel.BackgroundTransparency = 1
-                            userNameLabel.TextColor3 = THEME_WHITE
-                            userNameLabel.Font = Enum.Font.Gotham
-                            userNameLabel.TextScaled = true 
-                            userNameLabel.TextTransparency = 0.2
-                            userNameLabel.TextStrokeTransparency = 0.5
-                            userNameLabel.Text = "@" .. player.Name
-                            userNameLabel.Parent = billboard
-                            
-                            local barContainer = Instance.new("Frame")
-                            barContainer.Name = "HealthBarContainer"
-                            barContainer.Size = UDim2.new(0.8, 0, 0.12, 0)
-                            barContainer.Position = UDim2.new(0.1, 0, 0.75, 0)
-                            barContainer.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
-                            barContainer.BorderSizePixel = 0
-                            barContainer.Parent = billboard
-                            
-                            local barStroke = Instance.new("UIStroke", barContainer)
-                            barStroke.Color = Color3.fromRGB(0, 0, 0)
-                            barStroke.Thickness = 1
-                            barStroke.Transparency = 0.5
-                            
-                            local barCorner = Instance.new("UICorner", barContainer)
-                            barCorner.CornerRadius = UDim.new(1, 0)
-                            
-                            local fill = Instance.new("Frame")
-                            fill.Name = "Fill"
-                            fill.Size = UDim2.new(1, 0, 1, 0)
-                            fill.BackgroundColor3 = HEALTH_COLOR_FULL
-                            fill.BorderSizePixel = 0
-                            fill.Parent = barContainer
-                            
-                            local fillCorner = Instance.new("UICorner", fill)
-                            fillCorner.CornerRadius = UDim.new(1, 0)
-                            
-                            nameplates[player] = billboard
-                        end
-                        
-                        -- เปิดการแสดงผลใหม่หากเคยโดนซ่อน
-                        billboard.Enabled = true
-                        
-                        if billboard then
-                            local dLabel = billboard:FindFirstChild("DisplayLabel")
-                            if dLabel then
-                                dLabel.TextColor3 = espColor 
-                            end
-                        end
-                        
-                        if billboard and humanoid then
-                            local barContainer = billboard:FindFirstChild("HealthBarContainer")
-                            if barContainer then
-                                local fill = barContainer:FindFirstChild("Fill")
-                                if fill then
-                                    local healthPercent = math.clamp(humanoid.Health / humanoid.MaxHealth, 0, 1)
-                                    
-                                    -- [PERFORMANCE FIX] ไม่ใช้ TweenService รันซ้ำทุกเฟรม ลดการใช้ CPU อย่างมหาศาล
-                                    fill.Size = UDim2.new(healthPercent, 0, 1, 0)
-                                    fill.BackgroundColor3 = HEALTH_COLOR_LOW:Lerp(HEALTH_COLOR_FULL, healthPercent)
-                                end
-                            end
-                        end
-                        
-                        local highlight = targetChar:FindFirstChild("FantasyHighlight")
-                        if not highlight then
-                            highlight = Instance.new("Highlight")
-                            highlight.Name = "FantasyHighlight"
-                            highlight.FillTransparency = 0.75
-                            highlight.OutlineTransparency = 0.2
-                            highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
-                            highlight.Parent = targetChar
-                        end
-                        
-                        -- เปิดการแสดงผลใหม่หากเคยโดนซ่อน
-                        highlight.Enabled = true
-                        highlight.FillColor = espColor
-                        highlight.OutlineColor = espColor
-                    else
-                        -- [NEW] ถ้าอยู่ไกลเกิน maxEspDistance ให้ซ่อน ESP ไว้ (ประหยัดสเปค)
-                        local billboard = nameplates[player]
-                        if billboard then billboard.Enabled = false end
-                        
-                        local highlight = targetChar:FindFirstChild("FantasyHighlight")
-                        if highlight then highlight.Enabled = false end
-                    end
-                end
-            else
-                if nameplates[player] then nameplates[player]:Destroy(); nameplates[player] = nil end
-            end
-        end
-    end
+	if currentTime - lastTime >= 1 then
+		local pingValue = math.round(localPlayer:GetNetworkPing() * 1000)
+
+		if pingValue < 100 then
+			pingLabel.TextColor3 = HEALTH_COLOR_FULL
+		elseif pingValue < 200 then
+			pingLabel.TextColor3 = Color3.fromRGB(255, 255, 85)
+		else
+			pingLabel.TextColor3 = HEALTH_COLOR_LOW
+		end
+
+		pingLabel.Text = "Ping: " .. pingValue .. " ms"
+
+		local currentPlayers = #Players:GetPlayers()
+		local maxPlayers = Players.MaxPlayers
+		playersCountLabel.Text = string.format("Players: %d/%d", currentPlayers, maxPlayers)
+
+		local nonFriendCount = 0
+		for _, p in ipairs(Players:GetPlayers()) do
+			if p ~= localPlayer then
+				if not friendStatus[p.UserId] then
+					nonFriendCount = nonFriendCount + 1
+				end
+			end
+		end
+		nonFriendsLabel.Text = "Enemies: " .. nonFriendCount
+
+		local timeInSeconds = math.floor(tick() - joinTime)
+		local hours = math.floor(timeInSeconds / 3600)
+		local minutes = math.floor((timeInSeconds % 3600) / 60)
+		local seconds = timeInSeconds % 60
+		timeLabel.Text = string.format("Time: %02d.%02d.%02d", hours, minutes, seconds)
+
+		lastTime = currentTime
+	end
+
+	if isFreeCamEnabled then
+		local moveVec = Vector3.new()
+
+		if UserInputService:IsKeyDown(Enum.KeyCode.W) then moveVec = moveVec + Vector3.new(0, 0, -1) end
+		if UserInputService:IsKeyDown(Enum.KeyCode.S) then moveVec = moveVec + Vector3.new(0, 0, 1) end
+		if UserInputService:IsKeyDown(Enum.KeyCode.A) then moveVec = moveVec + Vector3.new(-1, 0, 0) end
+		if UserInputService:IsKeyDown(Enum.KeyCode.D) then moveVec = moveVec + Vector3.new(1, 0, 0) end
+		if UserInputService:IsKeyDown(Enum.KeyCode.Q) then moveVec = moveVec + Vector3.new(0, -1, 0) end
+		if UserInputService:IsKeyDown(Enum.KeyCode.E) then moveVec = moveVec + Vector3.new(0, 1, 0) end
+
+		local currentSpeed = freeCamSpeed
+		if UserInputService:IsKeyDown(Enum.KeyCode.LeftShift) then currentSpeed = freeCamSpeed * 2.5 end
+
+		local rotCFrame = CFrame.fromEulerAnglesYXZ(camRotX, camRotY, 0)
+		local newPos = camera.CFrame.Position + (rotCFrame * moveVec * currentSpeed * dt)
+
+		camera.CFrame = CFrame.new(newPos) * rotCFrame
+
+	elseif spectatingPlayer then
+		if not spectatingPlayer.Parent or not spectatingPlayer.Character or not spectatingPlayer.Character:FindFirstChild("Humanoid") then
+			-- Wait for switch
+		else
+			if isCamLockRotation and spectatingPlayer.Character:FindFirstChild("HumanoidRootPart") then
+				camera.CameraType = Enum.CameraType.Scriptable
+
+				local hrp = spectatingPlayer.Character.HumanoidRootPart
+				-- [NEW] นำค่า spectateZoomDistance มาใช้แทนเลข 10 ล็อคระยะห่างของมุมกล้อง
+				local targetCFrame = hrp.CFrame * CFrame.new(0, 3, spectateZoomDistance)
+
+				camera.CFrame = camera.CFrame:Lerp(targetCFrame, 1 - math.exp(-15 * dt))
+			else
+				camera.CameraType = Enum.CameraType.Custom
+				if camera.CameraSubject ~= spectatingPlayer.Character.Humanoid then
+					camera.CameraSubject = spectatingPlayer.Character.Humanoid
+				end
+			end
+		end
+	end
+
+	if isEspEnabled then
+		local camPos = camera.CFrame.Position
+
+		for _, player in ipairs(Players:GetPlayers()) do
+			if player == localPlayer then continue end
+			local targetChar = player.Character
+
+			if targetChar and targetChar.Parent then
+				local head = targetChar:FindFirstChild("Head")
+				local rootPart = targetChar:FindFirstChild("HumanoidRootPart")
+				local humanoid = targetChar:FindFirstChild("Humanoid")
+
+				if head and rootPart then
+					local distance = (rootPart.Position - camPos).Magnitude
+
+					if distance <= maxEspDistance then
+						local isFriend = friendStatus[player.UserId]
+						local isBlocked = blockedStatus[player.UserId]
+
+						local espColor = COLOR_ENEMY
+						if isBlocked then
+							espColor = COLOR_BLOCKED_USER
+						elseif isFriend then
+							espColor = THEME_MAIN
+						end
+
+						local billboard = nameplates[player]
+
+						if not billboard or billboard.Adornee ~= head then
+							if billboard then billboard:Destroy() end
+							billboard = Instance.new("BillboardGui")
+							billboard.Name = "TextOnlyESP"
+							billboard.Size = UDim2.new(0, 140, 0, 50)
+							billboard.StudsOffset = Vector3.new(0, 3.5, 0)
+							billboard.AlwaysOnTop = true
+							billboard.Active = true
+
+							billboard.Parent = espFolder
+							billboard.Adornee = head
+
+							local clickBtn = Instance.new("TextButton")
+							clickBtn.Name = "ClickToSpectate"
+							clickBtn.Size = UDim2.new(1, 0, 1, 0)
+							clickBtn.BackgroundTransparency = 1
+							clickBtn.Text = ""
+							clickBtn.ZIndex = 10
+							clickBtn.Parent = billboard
+
+							clickBtn.MouseButton1Click:Connect(function()
+								startSpectating(player)
+							end)
+
+							local displayNameLabel = Instance.new("TextLabel", billboard)
+							displayNameLabel.Name = "DisplayLabel"
+							displayNameLabel.Size = UDim2.new(1, 0, 0.4, 0)
+							displayNameLabel.Position = UDim2.new(0, 0, 0, 0)
+							displayNameLabel.BackgroundTransparency = 1
+							displayNameLabel.Font = Enum.Font.GothamMedium
+							displayNameLabel.TextScaled = true
+							displayNameLabel.TextStrokeTransparency = 0.5
+							displayNameLabel.Text = player.DisplayName
+
+							local userNameLabel = Instance.new("TextLabel", billboard)
+							userNameLabel.Size = UDim2.new(1, 0, 0.3, 0)
+							userNameLabel.Position = UDim2.new(0, 0, 0.4, 0)
+							userNameLabel.BackgroundTransparency = 1
+							userNameLabel.TextColor3 = THEME_WHITE
+							userNameLabel.Font = Enum.Font.Gotham
+							userNameLabel.TextScaled = true
+							userNameLabel.TextTransparency = 0.2
+							userNameLabel.TextStrokeTransparency = 0.5
+							userNameLabel.Text = "@" .. player.Name
+							userNameLabel.Parent = billboard
+
+							local barContainer = Instance.new("Frame")
+							barContainer.Name = "HealthBarContainer"
+							barContainer.Size = UDim2.new(0.8, 0, 0.12, 0)
+							barContainer.Position = UDim2.new(0.1, 0, 0.75, 0)
+							barContainer.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+							barContainer.BorderSizePixel = 0
+							barContainer.Parent = billboard
+
+							local barStroke = Instance.new("UIStroke", barContainer)
+							barStroke.Color = Color3.fromRGB(0, 0, 0)
+							barStroke.Thickness = 1
+							barStroke.Transparency = 0.5
+
+							local barCorner = Instance.new("UICorner", barContainer)
+							barCorner.CornerRadius = UDim.new(1, 0)
+
+							local fill = Instance.new("Frame")
+							fill.Name = "Fill"
+							fill.Size = UDim2.new(1, 0, 1, 0)
+							fill.BackgroundColor3 = HEALTH_COLOR_FULL
+							fill.BorderSizePixel = 0
+							fill.Parent = barContainer
+
+							local fillCorner = Instance.new("UICorner", fill)
+							fillCorner.CornerRadius = UDim.new(1, 0)
+
+							nameplates[player] = billboard
+						end
+
+						billboard.Enabled = true
+
+						if billboard then
+							local dLabel = billboard:FindFirstChild("DisplayLabel")
+							if dLabel then
+								dLabel.TextColor3 = espColor
+							end
+						end
+
+						if billboard and humanoid then
+							local barContainer = billboard:FindFirstChild("HealthBarContainer")
+							if barContainer then
+								local fill = barContainer:FindFirstChild("Fill")
+								if fill then
+									local healthPercent = math.clamp(humanoid.Health / humanoid.MaxHealth, 0, 1)
+
+									fill.Size = UDim2.new(healthPercent, 0, 1, 0)
+									fill.BackgroundColor3 = HEALTH_COLOR_LOW:Lerp(HEALTH_COLOR_FULL, healthPercent)
+								end
+							end
+						end
+
+						local highlight = targetChar:FindFirstChild("FantasyHighlight")
+						if not highlight then
+							highlight = Instance.new("Highlight")
+							highlight.Name = "FantasyHighlight"
+							highlight.FillTransparency = 0.75
+							highlight.OutlineTransparency = 0.2
+							highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+							highlight.Parent = targetChar
+						end
+
+						highlight.Enabled = true
+						highlight.FillColor = espColor
+						highlight.OutlineColor = espColor
+					else
+						local billboard = nameplates[player]
+						if billboard then billboard.Enabled = false end
+
+						local highlight = targetChar:FindFirstChild("FantasyHighlight")
+						if highlight then highlight.Enabled = false end
+					end
+				end
+			else
+				if nameplates[player] then nameplates[player]:Destroy(); nameplates[player] = nil end
+			end
+		end
+	end
 end)
 table.insert(getgenv().AKB_Connections, renderSteppedConnection)
 
 Players.PlayerAdded:Connect(function(player)
-    checkFriendStatus(player)
-    updatePlayerList()
-    previousHealths[player.UserId] = 100 -- Init health
+	checkFriendStatus(player)
+	updatePlayerList()
+	previousHealths[player.UserId] = 100
 end)
 
 Players.PlayerRemoving:Connect(function(player)
-    friendStatus[player.UserId] = nil 
-    previousHealths[player.UserId] = nil
-    
-    if spectatingPlayer == player then
-        switchToNearestPlayer(player)
-    end
-    updatePlayerList()
+	friendStatus[player.UserId] = nil
+	previousHealths[player.UserId] = nil
+
+	if spectatingPlayer == player then
+		switchToNearestPlayer(player)
+	end
+	updatePlayerList()
 end)
 
 nameButton.MouseButton1Click:Connect(function()
-    isNameVisible = not isNameVisible
-    nameContainer.Visible = isNameVisible
-    nameButton.Text = isNameVisible and "🌟 จารึกชื่อ: เปิด" or "📜 จารึกชื่อ: ปิด"
+	isNameVisible = not isNameVisible
+	nameContainer.Visible = isNameVisible
+	nameButton.Text = isNameVisible and "🌟 จารึกชื่อ: เปิด" or "📜 จารึกชื่อ: ปิด"
 end)
 
 listButton.MouseButton1Click:Connect(function()
-    isPlayerListVisible = not isPlayerListVisible
-    listFrame.Visible = isPlayerListVisible
-    searchBox.Visible = isPlayerListVisible
-    if spectatingPlayer or isFreeCamEnabled then resetButton.Visible = isPlayerListVisible end
-    
-    if isPlayerListVisible then
-        updatePlayerList()
-    end
+	isPlayerListVisible = not isPlayerListVisible
+	listFrame.Visible = isPlayerListVisible
+	searchBox.Visible = isPlayerListVisible
+	if spectatingPlayer or isFreeCamEnabled then resetButton.Visible = isPlayerListVisible end
+
+	if isPlayerListVisible then
+		updatePlayerList()
+	end
 end)
 
-print("Fantasy ESP: Script Loaded Successfully!")
+print("AKB System: Script Loaded Successfully!")
 updatePlayerList()
-
-pcall(function()
-    StarterGui:SetCore("SendNotification", {
-        Title = "AKB Script";
-        Text = "Loaded Successfully! (Performance Boosted)";
-        Duration = 5;
-    })
-end)
